@@ -8,7 +8,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-# from CASIA_iris import CASIA_Iris
+import utils as utils
 
 
 FLAGS = tf.flags.FLAGS
@@ -19,45 +19,45 @@ tf.flags.DEFINE_string('output_data', '../../Data/OpenEDS/Semantic_Segmentation_
 tf.flags.DEFINE_string('stage', 'train', 'stage selection from [train|validation|test], default: train')
 
 
-def data_writer(input_dir, output_name):
-    # dataset = CASIA_Iris(data_path=input_dir)
-    # file_paths = dataset.file_names
-    # num_imgs = len(file_paths)
+def data_writer(inputDir, stage, outputName):
+    dataPath = os.path.join(inputDir, '{}'.format(stage), 'paired')
+    imgPaths = utils.all_files_under(folder=dataPath, subfolder='')
+    numImgs = len(imgPaths)
 
     # Create tfrecrods dir if not exists
-    output_file = '{}.tfrecords'.format(output_name)
+    output_file = '{0}/{1}/{1}.tfrecords'.format(outputName, stage)
     if not os.path.isdir(os.path.dirname(output_file)):
         os.makedirs(os.path.dirname(output_file))
 
     # Dump to tfrecords file
-    writer = tf.python_io.TFRecordWriter(output_file)
+    writer = tf.io.TFRecordWriter(output_file)
 
-    for idx in range(num_imgs):
-        img_path = file_paths[idx]
-
-        with tf.gfile.FastGFile(img_path, 'rb') as f:
+    for idx, img_path in enumerate(imgPaths):
+        with tf.io.gfile.GFile(img_path, 'rb') as f:
             img_data = f.read()
 
         example = _convert_to_example(img_path, img_data)
         writer.write(example.SerializeToString())
 
         if np.mod(idx, 100) == 0:
-            print('Processed {}/{}...'.format(idx, num_imgs))
+            print('Processed {}/{}...'.format(idx, numImgs))
 
     print('Finished!')
     writer.close()
 
 
-def _convert_to_example(img_path, userId, img_buffer):
+def _convert_to_example(imgPath, imgBuffer):
     # Build an example proto
-    img_name = os.path.basename(img_path)
+    imgName = os.path.basename(imgPath)
+    userId = imgName.replace('.png', '').split('_')[1]
 
     example = tf.train.Example(features=tf.train.Features(
-        feature={'image/file_name': _bytes_feature(tf.compat.as_bytes(img_name)),
+        feature={'image/file_name': _bytes_feature(tf.compat.as_bytes(imgName)),
                  'image/user_id': _bytes_feature(tf.compat.as_bytes(userId)),
-                 'image/encoded_image': _bytes_feature(img_buffer)}))
+                 'image/encoded_image': _bytes_feature(imgBuffer)}))
 
     return example
+
 
 def _bytes_feature(value):
     # Wrapper for inserting bytes features into example proto
@@ -66,8 +66,8 @@ def _bytes_feature(value):
 
 def main(_):
     print("Convert {} - {} data to tfrecrods...".format(FLAGS.input_data, FLAGS.stage))
-    data_writer(FLAGS.input_data, FLAGS.output_data)
+    data_writer(FLAGS.input_data, FLAGS.stage, FLAGS.output_data)
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    tf.compat.v1.app.run()
