@@ -1,4 +1,8 @@
 src/.idea/
 src/__pycache__/
 src/test.py
+src/log/
+src/model/
+src/test/
+src/sample/
 debugImgs/

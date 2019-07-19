@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import cv2
 import numpy as np
 
@@ -59,6 +60,86 @@ class SSData(object):
         data = init_canvas(img.shape[0], img.shape[1], channel=1, img1=img, img2=label, times=2, axis=1)
 
         return data, userId, imgName
+
+
+def make_folders(isTrain=True, curTime=None):
+    modelDir = os.path.join('model', '{}'.format(curTime))
+    logDir = os.path.join('log', '{}'.format(curTime))
+    sampleDir = os.path.join('sample', '{}'.format(curTime))
+    testDir = None
+
+    if isTrain:
+        if not os.path.isdir(modelDir):
+            os.makedirs(modelDir)
+
+        if not os.path.isdir(logDir):
+            os.makedirs(logDir)
+
+        if not os.path.isdir(sampleDir):
+            os.makedirs(sampleDir)
+    else:
+        testDir = os.path.join('test', '{}'.format(curTime))
+
+        if not os.path.isdir(testDir):
+            os.makedirs(testDir)
+
+    return modelDir, logDir, sampleDir, testDir
+
+
+def init_logger(logger, logDir, name, isTrain):
+    logger.propagate = False  # solve print log multiple times problems
+    fileHandler, streamHandler = None, None
+
+    if isTrain:
+        formatter = logging.Formatter(' - %(message)s')
+
+        # File handler
+        fileHandler = logging.FileHandler(os.path.join(logDir, name + '.log'))
+        fileHandler.setFormatter(formatter)
+        fileHandler.setLevel(logging.INFO)
+
+        # Stream handler
+        streamHandler = logging.StreamHandler()
+        streamHandler.setFormatter(formatter)
+
+        # Add handlers
+        if not logger.handlers:
+            logger.addHandler(fileHandler)
+            logger.addHandler(streamHandler)
+
+    return logger, fileHandler, streamHandler
+
+
+def print_main_parameters(logger, flags, isTrain=False):
+    if isTrain:
+        logger.info('gpu_index: \t\t\t{}'.format(flags.gpu_index))
+        logger.info('dataset: \t\t\t{}'.format(flags.dataset))
+        logger.info('method: \t\t\t{}'.format(flags.method))
+        logger.info('batch_size: \t\t\t{}'.format(flags.batch_size))
+        logger.info('resize_factor: \t\t{}'.format(flags.resize_factor))
+        logger.info('is_train: \t\t\t{}'.format(flags.is_train))
+        logger.info('learing_rate: \t\t{}'.format(flags.learning_rate))
+        logger.info('weight_decay: \t\t{}'.format(flags.weight_decay))
+        logger.info('iters: \t\t\t{}'.format(flags.iters))
+        logger.info('print_freq: \t\t\t{}'.format(flags.print_freq))
+        logger.info('sample_freq: \t\t{}'.format(flags.sample_freq))
+        logger.info('eval_freq: \t\t\t{}'.format(flags.eval_freq))
+        logger.info('load_model: \t\t\t{}'.format(flags.load_model))
+    else:
+        print('-- gpu_index: \t\t{}'.format(flags.gpu_index))
+        print('-- dataset: \t\t{}'.format(flags.dataset))
+        print('-- method: \t\t{}'.format(flags.method))
+        print('-- batch_size: \t\t{}'.format(flags.batch_size))
+        print('-- resize_factor: \t\t{}'.format(flags.resize_factor))
+        print('-- is_train: \t\t{}'.format(flags.is_train))
+        print('-- learing_rate: \t{}'.format(flags.learning_rate))
+        print('-- weight_decay: \t{}'.format(flags.weight_decay))
+        print('-- iters: \t\t{}'.format(flags.iters))
+        print('-- print_freq: \t\t{}'.format(flags.print_freq))
+        print('-- sample_freq: \t{}'.format(flags.sample_freq))
+        print('-- eval_freq: \t\t{}'.format(flags.eval_freq))
+        print('-- load_model: \t\t{}'.format(flags.load_model))
+
 
 
 def all_files_under(folder, subfolder='images', endswith='.png'):
