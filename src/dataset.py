@@ -20,14 +20,15 @@ class OpenEDS(object):
         self.numTrainPersons = 95
         self.numValPersons = 28
         self.numTestPersons = 29
+        self.numClasses = 4
 
-        self.imgShape = (int(640 * resizedFactor), int(400 * 2 * resizedFactor), 1)
-        self.singleImgShape = (int(640 * resizedFactor), int(400 * resizedFactor))
+        self.decodeImgShape = (int(640 * resizedFactor), int(400 * 2 * resizedFactor), 1)
+        self.singleImgShape = (int(640 * resizedFactor), int(400 * resizedFactor), 1)
 
         # TFrecord path
-        self.trainPath = '../../Data/OpenEDS/{}/train/train.tfrecords'.format(track)
-        self.valPath = '../../Data/OpenEDS/{}/validation/validation.tfrecords'.format(track)
-        self.testPath = '../../Data/OpenEDS/{}/test/test.tfrecords'.format(track)
+        self.trainPath = '../../Data/OpenEDS/{}/train/train.tfrecords'.format(self.track)
+        self.valPath = '../../Data/OpenEDS/{}/validation/validation.tfrecords'.format(self.track)
+        self.testPath = '../../Data/OpenEDS/{}/test/test.tfrecords'.format(self.track)
 
         if isTrain:
             self.logger = logging.getLogger(__name__)   # logger
@@ -42,7 +43,8 @@ class OpenEDS(object):
             self.logger.info('Num. of training persons: \t{}'.format(self.numTrainPersons))
             self.logger.info('Num. of validation persons: \t{}'.format(self.numValPersons))
             self.logger.info('Num. of test persons: \t{}'.format(self.numTestPersons))
-            self.logger.info('Image shape: \t\t{}'.format(self.imgShape))
+            self.logger.info('Num. of classes: \t\t{}'.format(self.numClasses))
+            self.logger.info('Decode image shape: \t{}'.format(self.decodeImgShape))
             self.logger.info('Single img shape: \t\t{}'.format(self.singleImgShape))
             self.logger.info('Training TFrecord path: \t{}'.format(self.trainPath))
             self.logger.info('Validation TFrecord path: \t{}'.format(self.valPath))
@@ -50,11 +52,11 @@ class OpenEDS(object):
 
     def __call__(self, isTrain=True):
         if isTrain:
-            return [self.trainPath, self.valPath]
+            return self.trainPath, self.valPath
         else:
-            return [self.testPath, None]
+            return self.testPath, None
 
-def Dataset(name, track='semantic_segmentation', isTrain=True, resizedFactor=0.5, logDir=None):
+def Dataset(name, track='Semantic_Segmentation_Dataset', isTrain=True, resizedFactor=0.5, logDir=None):
     if name == 'OpenEDS':
         return OpenEDS(name=name, track=track, isTrain=isTrain, resizedFactor=resizedFactor, logDir=logDir)
     else:

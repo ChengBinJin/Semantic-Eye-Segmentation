@@ -6,7 +6,9 @@
 # -------------------------------------------------------------------------
 
 import os
+import cv2
 import logging
+import numpy as np
 import tensorflow as tf
 from datetime import datetime
 
@@ -52,18 +54,56 @@ def main(_):
     data = Dataset(name=FLAGS.dataset, isTrain=FLAGS.is_train, resizedFactor=FLAGS.resize_factor, logDir=logDir)
 
     # Initialize model
+    model = None
     if FLAGS.method == 'U-Net':
-        model = UNet(imageShape=data.imgShape,
+        model = UNet(decodeImgShape=data.decodeImgShape,
                      outputShape=data.singleImgShape,
-                     resizeFactor=FLAGS.resize_factor,
+                     numClasses=data.numClasses,
                      dataPath=data(isTrain=FLAGS.is_train),
                      batchSize=FLAGS.batch_size,
                      lr=FLAGS.learning_rate,
-                     weight_decay=FLAGS.weight_decay,
-                     total_iters=FLAGS.iters,
+                     weightDecay=FLAGS.weight_decay,
+                     totalIters=FLAGS.iters,
                      isTrain=FLAGS.is_train,
                      logDir=logDir,
                      name='UNet')
+
+    sess = tf.compat.v1.Session()
+    sess.run(tf.compat.v1.global_variables_initializer())
+
+    # Threads for tfrecord
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    iter_time = 0
+    try:
+        while iter_time < 10:
+            print('Iter: {}'.format(iter_time))
+            img_val, target_val = sess.run([model.img, model.target])
+            print('img_val shape: {}'.format(img_val[0].shape))
+            img_val = np.squeeze(img_val).astype(np.uint8)
+            target_val = np.squeeze(target_val).astype(np.uint8)
+
+            n, h, w = img_val.shape
+            for i in range(n):
+                print('I: {}'.format(i))
+                img_new = np.zeros((h, 2*w, 3), dtype=np.uint8)
+                img_new[:, :w, :] = np.dstack((img_val[i], img_val[i], img_val[i]))
+                img_new[:, w:, :] = utils.convert_color_label(target_val[i].copy())
+
+                cv2.imshow('Show', img_new)
+                cv2.waitKey(0)
+
+            iter_time += 1
+
+    except KeyboardInterrupt:
+        coord.request_stop()
+    except Exception as e:
+        coord.request_stop(e)
+    finally:
+        coord.request_stop()
+        coord.join(threads)
+
 
 
 if __name__ == '__main__':
