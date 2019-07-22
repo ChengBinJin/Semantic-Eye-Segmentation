@@ -79,19 +79,19 @@ def main(_):
     try:
         while iter_time < 10:
             print('Iter: {}'.format(iter_time))
-            img_val, target_val = sess.run([model.img, model.target])
-            print('img_val shape: {}'.format(img_val[0].shape))
-            img_val = np.squeeze(img_val).astype(np.uint8)
-            target_val = np.squeeze(target_val).astype(np.uint8)
+            img, segImg = sess.run([model.img, model.segImg])
+            print('img_val shape: {}'.format(img[0].shape))
+            img = np.squeeze(img).astype(np.uint8)
+            segImg = np.squeeze(segImg).astype(np.uint8)
 
-            n, h, w = img_val.shape
+            n, h, w = img.shape
             for i in range(n):
                 print('I: {}'.format(i))
-                img_new = np.zeros((h, 2*w, 3), dtype=np.uint8)
-                img_new[:, :w, :] = np.dstack((img_val[i], img_val[i], img_val[i]))
-                img_new[:, w:, :] = utils.convert_color_label(target_val[i].copy())
+                imgNew = np.zeros((h, 2*w, 3), dtype=np.uint8)
+                imgNew[:, :w, :] = np.dstack((img[i], img[i], img[i]))
+                imgNew[:, w:, :] = utils.convert_color_label(segImg[i].copy())
 
-                cv2.imshow('Show', img_new)
+                cv2.imshow('Show', imgNew)
                 cv2.waitKey(0)
 
             iter_time += 1

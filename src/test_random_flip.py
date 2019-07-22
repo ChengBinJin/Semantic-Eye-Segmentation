@@ -7,7 +7,7 @@ import utils as utils
 from reader import Reader
 
 
-def test_random_translation(dataPath, decodeImgShape, batchSize, isTrain, numImgs=5, margin=5, savePath='../debugImgs'):
+def test_random_flip(dataPath, decodeImgShape, batchSize, isTrain, numImgs=5, margin=5, savePath='../debugImgs'):
     winName = "Show"
     cv2.namedWindow(winName)
     cv2.moveWindow(winName, 10, 10)
@@ -16,7 +16,7 @@ def test_random_translation(dataPath, decodeImgShape, batchSize, isTrain, numImg
                          decodeImgShape=decodeImgShape,
                          batchSize=batchSize,
                          isTrain=isTrain)
-    imgOp, segImgOp, imgOriOp, segImgOriOp = trainReader.test_random_translation(numImgs=numImgs)
+    imgOp, segImgOp, imgOriOp, segImgOriOp = trainReader.test_random_flip(numImgs=numImgs)
     sess = tf.compat.v1.Session()
 
     # Threads for tfrecord
@@ -33,7 +33,6 @@ def test_random_translation(dataPath, decodeImgShape, batchSize, isTrain, numImg
             segImgOri = np.squeeze(segImgOri).astype(np.uint8)
 
             h, w = imgOri.shape
-
             canvas = np.zeros((2 * h + 3 *margin, (numImgs + 1) * w + (numImgs + 3) * margin, 3), dtype=np.uint8)
             for j in range(numImgs+1):
                 if j == 0:
@@ -49,7 +48,7 @@ def test_random_translation(dataPath, decodeImgShape, batchSize, isTrain, numImg
             if cv2.waitKey(100) & 0xFF == 27:
                 exit('Esc clicked!')
 
-            cv2.imwrite(os.path.join(savePath, 'test_random_translation_' + str(i).zfill(2) + '.png'), canvas)
+            cv2.imwrite(os.path.join(savePath, 'test_random_flip_' + str(i).zfill(2) + '.png'), canvas)
 
     except KeyboardInterrupt:
         coord.request_stop()
@@ -67,4 +66,4 @@ if __name__ == '__main__':
     isTrain_ = True
     numImgs_ = 5
 
-    test_random_translation(dataPath_, decodeImgShape_, batchSize_, isTrain_, numImgs_)
+    test_random_flip(dataPath_, decodeImgShape_, batchSize_, isTrain_, numImgs_)

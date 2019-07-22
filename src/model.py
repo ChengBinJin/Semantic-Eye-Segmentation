@@ -50,7 +50,7 @@ class UNet(object):
                              batchSize=self.batchSize,
                              isTrain=self.isTrain)
 
-        self.img, self.target = trainReader.shuffle_batch()
+        self.img, self.segImg = trainReader.shuffle_batch()
 
         self.predicion = self.forward(inputImg=self.img)
 
