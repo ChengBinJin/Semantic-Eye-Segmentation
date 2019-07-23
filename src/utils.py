@@ -1,3 +1,10 @@
+# --------------------------------------------------------------------------
+# Tensorflow Implementation of OpenEDS Semantic Segmentation Challenge
+# Licensed under The MIT License [see LICENSE for details]
+# Written by Cheng-Bin Jin
+# Email: sbkim0407@gmail.com
+# -------------------------------------------------------------------------
+
 import os
 import json
 import logging
@@ -27,7 +34,7 @@ class SSData(object):
     def __init__(self, data_path, json_path, stage):
         self.dataPath = os.path.join(data_path, stage)
         self.jsonPath = json_path
-        self.stage = stage
+        self.stage = stage if stage != 'overfitting' else 'train'
 
         # Read image paths
         self.img_paths = all_files_under(self.dataPath, subfolder='images', endswith='.png')

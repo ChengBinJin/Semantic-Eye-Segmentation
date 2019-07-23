@@ -41,11 +41,18 @@ class Reader(object):
             imageBuffer = features['image/encoded_image']
             # userIdBuffer = features['image/user_id']
             # imageNameBuffer = features['image/file_name']
-            self.image = tf.image.decode_jpeg(imageBuffer, channels=self.imgShape[2])
+            image = tf.image.decode_jpeg(imageBuffer, channels=self.imgShape[2])
+
+            # Resize to 2D
+            image = tf.image.resize(image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
+
+            # Split to two images
+            self.imgOri, self.segImgOri = tf.split(image, num_or_size_splits=[self.imgShape[1], self.imgShape[1]],
+                                                   axis=1)
 
     def shuffle_batch(self):
         # img_ori, img_trans, img_flip, img_rotate = self.preprocess(image, is_train=self.is_train)
-        img, segImg = self.preprocess(self.image, isTrain=self.isTrain)
+        img, segImg = self.preprocess(self.imgOri, self.segImgOri, isTrain=self.isTrain)
 
         return tf.train.shuffle_batch(tensors=[img, segImg],
                                       batch_size=self.batchSize,
@@ -53,19 +60,13 @@ class Reader(object):
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
-    def preprocess(self, image, isTrain=True):
-        # Resize to 2D
-        image = tf.image.resize(image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
-        # Split to two images
-        imgOri, segImgOri = tf.split(image, num_or_size_splits=[self.imgShape[1], self.imgShape[1]], axis=1)
-
+    def preprocess(self, imgOri, segImgOri, isTrain=True):
         # Data augmentation
         if isTrain:
             imgTrans, segImgTrans = self.random_translation(imgOri, segImgOri)      # Random translation
             imgFlip, segImgFlip = self.random_flip(imgTrans, segImgTrans)           # Random left-right flip
             imgBrit, segImgBrit = self.random_brightness(imgFlip, segImgFlip)       # Random brightness
             imgRotate, segImgRotate = self.random_rotation(imgBrit, segImgBrit)     # Random rotation
-
         else:
             imgRotate = imgOri
             segImgRotate = segImgOri
@@ -137,68 +138,48 @@ class Reader(object):
         return img, segImg
 
     def test_random_translation(self, numImgs):
-        # Resize to 2D
-        image = tf.image.resize(self.image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
-        # Split to two images
-        imgOri, segImgOri = tf.split(image, num_or_size_splits=[self.imgShape[1], self.imgShape[1]], axis=1)
-
         imgs, segImgs = list(), list()
         for i in range(numImgs):
-            img, segImg = self.random_translation(imgOri, segImgOri)
+            img, segImg = self.random_translation(self.imgOri, self.segImgOri)
             imgs.append(img), segImgs.append(segImg)
 
-        return tf.train.shuffle_batch(tensors=[imgs, segImgs, imgOri, segImgOri],
+        return tf.train.shuffle_batch(tensors=[imgs, segImgs, self.imgOri, self.segImgOri],
                                       batch_size=self.batchSize,
                                       num_threads=self.numThreads,
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
     def test_random_flip(self, numImgs):
-        # Resize to 2D
-        image = tf.image.resize(self.image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
-        # Split to two images
-        imgOri, segImgOri = tf.split(image, num_or_size_splits=[self.imgShape[1], self.imgShape[1]], axis=1)
-
         imgs, segImgs = list(), list()
         for i in range(numImgs):
-            img, segImg = self.random_flip(imgOri, segImgOri)
+            img, segImg = self.random_flip(self.imgOri, self.segImgOri)
             imgs.append(img), segImgs.append(segImg)
 
-        return tf.train.shuffle_batch(tensors=[imgs, segImgs, imgOri, segImgOri],
+        return tf.train.shuffle_batch(tensors=[imgs, segImgs, self.imgOri, self.segImgOri],
                                       batch_size=self.batchSize,
                                       num_threads=self.numThreads,
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
     def test_random_brightness(self, numImgs):
-        # Resize to 2D
-        image = tf.image.resize(self.image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
-        # Split to two images
-        imgOri, segImgOri = tf.split(image, num_or_size_splits=[self.imgShape[1], self.imgShape[1]], axis=1)
-
         imgs, segImgs = list(), list()
         for i in range(numImgs):
-            img, segImg = self.random_brightness(imgOri, segImgOri)
+            img, segImg = self.random_brightness(self.imgOri, self.segImgOri)
             imgs.append(img), segImgs.append(segImg)
 
-        return tf.train.shuffle_batch(tensors=[imgs, segImgs, imgOri, segImgOri],
+        return tf.train.shuffle_batch(tensors=[imgs, segImgs, self.imgOri, self.segImgOri],
                                       batch_size=self.batchSize,
                                       num_threads=self.numThreads,
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
     def test_random_rotation(self, numImgs):
-        # Resize to 2D
-        image = tf.image.resize(self.image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
-        # Split to two images
-        imgOri, segImgOri = tf.split(image, num_or_size_splits=[self.imgShape[1], self.imgShape[1]], axis=1)
-
         imgs, segImgs = list(), list()
         for i in range(numImgs):
-            img, segImg = self.random_rotation(imgOri, segImgOri)
+            img, segImg = self.random_rotation(self.imgOri, self.segImgOri)
             imgs.append(img), segImgs.append(segImg)
 
-        return tf.train.shuffle_batch(tensors=[imgs, segImgs, imgOri, segImgOri],
+        return tf.train.shuffle_batch(tensors=[imgs, segImgs, self.imgOri, self.segImgOri],
                                       batch_size=self.batchSize,
                                       num_threads=self.numThreads,
                                       capacity=self.minQueueExamples + 3 * self.batchSize,

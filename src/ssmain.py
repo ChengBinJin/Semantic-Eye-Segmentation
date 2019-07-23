@@ -15,20 +15,22 @@ from datetime import datetime
 import utils as utils
 from dataset import Dataset
 from model import UNet
+from solver import Solver
+
 
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
 tf.flags.DEFINE_string('method', 'U-Net', 'Segmentation model [U-Net, VAE], default: U-Net')
-tf.flags.DEFINE_integer('batch_size', 2, 'batch size for one iteration, default: 16')
+tf.flags.DEFINE_integer('batch_size', 4, 'batch size for one iteration, default: 16')
 tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')
 tf.flags.DEFINE_float('weight_decay', 1e-4, 'weight decay for model to handle overfitting, default: 0.0001')
-tf.flags.DEFINE_integer('iters', 20, 'number of iterations, default: 200,000')
+tf.flags.DEFINE_integer('iters', 100, 'number of iterations, default: 200,000')
 tf.flags.DEFINE_integer('print_freq', 10, 'print frequency for loss information, default: 10')
-tf.flags.DEFINE_integer('sample_freq', 200, 'sample frequence for checking qualitative evaluation, default: 100')
-tf.flags.DEFINE_integer('eval_freq', 2000, 'evaluation frequencey for evaluation of the batch accuracy, default: 200')
+tf.flags.DEFINE_integer('sample_freq', 20, 'sample frequence for checking qualitative evaluation, default: 100')
+tf.flags.DEFINE_integer('eval_freq', 20, 'evaluation frequencey for evaluation of the batch accuracy, default: 200')
 tf.flags.DEFINE_string('load_model', None, 'folder of saved model taht you wish to continue training '
                                            '(e.g. 20190719-1409), default: None')
 
@@ -68,42 +70,45 @@ def main(_):
                      logDir=logDir,
                      name='UNet')
 
-    sess = tf.compat.v1.Session()
-    sess.run(tf.compat.v1.global_variables_initializer())
+    solver = Solver(model)
 
+    if FLAGS.is_train is True:
+        train(solver, modelDir, sampleDir)
+    else:
+        test()
+
+def train(solver, modelDir, sampleDir):
     # Threads for tfrecord
     coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+    threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
 
-    iter_time = 0
     try:
-        while iter_time < 10:
-            print('Iter: {}'.format(iter_time))
-            img, segImg = sess.run([model.img, model.segImg])
-            print('img_val shape: {}'.format(img[0].shape))
-            img = np.squeeze(img).astype(np.uint8)
-            segImg = np.squeeze(segImg).astype(np.uint8)
+        for iterTime in range(FLAGS.iters):
+            _, totalLoss, dataLoss, regTerm = solver.train()
 
-            n, h, w = img.shape
-            for i in range(n):
-                print('I: {}'.format(i))
-                imgNew = np.zeros((h, 2*w, 3), dtype=np.uint8)
-                imgNew[:, :w, :] = np.dstack((img[i], img[i], img[i]))
-                imgNew[:, w:, :] = utils.convert_color_label(segImg[i].copy())
+            if iterTime % FLAGS.print_freq == 0:
+                msg = "[{0:6} / {1:6}] \tTotal loss: {2:.3f}, \tData loss: {3:.3f}, \tReg. term: {4:.3f}"
+                print(msg.format(iterTime, FLAGS.iters, totalLoss, dataLoss, regTerm))
 
-                cv2.imshow('Show', imgNew)
-                cv2.waitKey(0)
+            if iterTime % FLAGS.sample_freq == 0:
+                solver.sample(iterTime, sampleDir)
 
-            iter_time += 1
+            if iterTime % FLAGS.eval_freq == 0:
+                mIoU = solver.eval()
+                print('mIoU: {}'.format(mIoU))
+
 
     except KeyboardInterrupt:
         coord.request_stop()
     except Exception as e:
         coord.request_stop(e)
     finally:
+        # when done, ask the threads to stop
         coord.request_stop()
         coord.join(threads)
 
+def test():
+    print("Hello test!")
 
 
 if __name__ == '__main__':

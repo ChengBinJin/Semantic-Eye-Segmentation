@@ -16,7 +16,7 @@ tf.flags.DEFINE_string('input_data', '../../Data/OpenEDS/Semantic_Segmentation_D
                        'data input directory, default: ../../Data/OpenEDS/Semantic_Segmentation_Dataset')
 tf.flags.DEFINE_string('output_data', '../../Data/OpenEDS/Semantic_Segmentation_Dataset',
                        'data output directory, default: ../../Data/OpenEDS/Semantic_Segmentation_Dataset')
-tf.flags.DEFINE_string('stage', 'train', 'stage selection from [train|validation|test], default: train')
+tf.flags.DEFINE_string('stage', 'train', 'stage selection from [train|validation|test|overfitting], default: train')
 
 
 def data_writer(inputDir, stage, outputName):

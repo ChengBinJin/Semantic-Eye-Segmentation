@@ -29,6 +29,7 @@ class OpenEDS(object):
         self.trainPath = '../../Data/OpenEDS/{}/train/train.tfrecords'.format(self.track)
         self.valPath = '../../Data/OpenEDS/{}/validation/validation.tfrecords'.format(self.track)
         self.testPath = '../../Data/OpenEDS/{}/test/test.tfrecords'.format(self.track)
+        self.overfittingPath = '../../Data/OpenEDS/{}/overfitting/overfitting.tfrecords'.format(self.track)
 
         if isTrain:
             self.logger = logging.getLogger(__name__)   # logger
@@ -49,10 +50,11 @@ class OpenEDS(object):
             self.logger.info('Training TFrecord path: \t{}'.format(self.trainPath))
             self.logger.info('Validation TFrecord path: \t{}'.format(self.valPath))
             self.logger.info('Test TFrecord path: \t\t{}'.format(self.testPath))
+            self.logger.info('Overfitting TFrecord path: \t\t{}'.format(self.overfittingPath))
 
     def __call__(self, isTrain=True):
         if isTrain:
-            return self.trainPath, self.valPath
+            return self.trainPath, self.valPath, self.overfittingPath
         else:
             return self.testPath, None
 

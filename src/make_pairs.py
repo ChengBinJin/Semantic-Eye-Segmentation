@@ -20,7 +20,7 @@ parser.add_argument('--json_path', dest='json_path', type=str,
                     help='json file path which includes user ID')
 parser.add_argument('--stage', dest='stage', type=str,
                     default='train',
-                    help='Select one of the stage in [train|validation|test]')
+                    help='Select one of the stage in [train|validation|test|overfitting]')
 args = parser.parse_args()
 
 
