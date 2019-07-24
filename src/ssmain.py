@@ -27,7 +27,7 @@ tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, defaul
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')
 tf.flags.DEFINE_float('weight_decay', 1e-4, 'weight decay for model to handle overfitting, default: 0.0001')
-tf.flags.DEFINE_integer('iters', 100, 'number of iterations, default: 200,000')
+tf.flags.DEFINE_integer('iters', 10, 'number of iterations, default: 200,000')
 tf.flags.DEFINE_integer('print_freq', 10, 'print frequency for loss information, default: 10')
 tf.flags.DEFINE_integer('sample_freq', 20, 'sample frequence for checking qualitative evaluation, default: 100')
 tf.flags.DEFINE_integer('eval_freq', 20, 'evaluation frequencey for evaluation of the batch accuracy, default: 200')
@@ -70,38 +70,49 @@ def main(_):
                      logDir=logDir,
                      name='UNet')
 
-    solver = Solver(model)
+    solver = Solver(model=model,
+                    data=data,
+                    batchSize=FLAGS.batch_size)
 
     if FLAGS.is_train is True:
-        train(solver, modelDir, sampleDir)
+        train(solver, modelDir, logDir, sampleDir)
     else:
         test()
 
-def train(solver, modelDir, sampleDir):
+def train(solver, modelDir, logDir, sampleDir):
+    # Tensorboard writer
+    tb_writer = tf.summary.FileWriter(logdir=logDir, graph=solver.sess.graph_def)
+
     # Threads for tfrecord
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
 
     try:
         for iterTime in range(FLAGS.iters):
-            _, totalLoss, dataLoss, regTerm = solver.train()
+            _, total_loss, data_loss, reg_term, summary = solver.train()
+
+            # Write to tensorboard
+            tb_writer.add_summary(summary, iterTime)
+            tb_writer.flush()
 
             if iterTime % FLAGS.print_freq == 0:
                 msg = "[{0:6} / {1:6}] \tTotal loss: {2:.3f}, \tData loss: {3:.3f}, \tReg. term: {4:.3f}"
-                print(msg.format(iterTime, FLAGS.iters, totalLoss, dataLoss, regTerm))
+                print(msg.format(iterTime, FLAGS.iters, total_loss, data_loss, reg_term))
 
             if iterTime % FLAGS.sample_freq == 0:
                 solver.sample(iterTime, sampleDir)
 
             if iterTime % FLAGS.eval_freq == 0:
                 mIoU = solver.eval()
-                print('mIoU: {}'.format(mIoU))
+                print('mIoU: {:.3f}'.format(mIoU))
 
 
     except KeyboardInterrupt:
         coord.request_stop()
     except Exception as e:
         coord.request_stop(e)
+    except tf.errors.OutOfRangeError:
+        coord.request_stop()
     finally:
         # when done, ask the threads to stop
         coord.request_stop()

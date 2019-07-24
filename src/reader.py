@@ -17,9 +17,9 @@ class Reader(object):
 
         self.minQueueExamples = minQueueExamples
         self.batchSize = batchSize
+        self.isTrain = isTrain
         self.numThreads = numThreads
         self.reader = tf.TFRecordReader()
-        self.isTrain = isTrain
         self.name = name
 
         # For data augmentations
@@ -29,7 +29,7 @@ class Reader(object):
         self._graph()
 
     def _graph(self):
-        with tf.name_scope(self.name):
+        with tf.compat.v1.variable_scope(self.name):
             filenameQueue = tf.train.string_input_producer([self.tfrecordsFile])
 
             _, serializedExample = self.reader.read(filenameQueue)
@@ -52,7 +52,7 @@ class Reader(object):
 
     def shuffle_batch(self):
         # img_ori, img_trans, img_flip, img_rotate = self.preprocess(image, is_train=self.is_train)
-        img, segImg = self.preprocess(self.imgOri, self.segImgOri, isTrain=self.isTrain)
+        img, segImg = self.preprocess(self.imgOri, self.segImgOri, self.isTrain)
 
         return tf.train.shuffle_batch(tensors=[img, segImg],
                                       batch_size=self.batchSize,
@@ -60,9 +60,19 @@ class Reader(object):
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
-    def preprocess(self, imgOri, segImgOri, isTrain=True):
-        # Data augmentation
+    def batch(self):
+        img, segImg = self.preprocess(self.imgOri, self.segImgOri, self.isTrain)
+
+        return tf.train.batch(tensors=[img, segImg],
+                              batch_size=self.batchSize,
+                              num_threads=self.numThreads,
+                              capacity=self.minQueueExamples + 3 * self.batchSize,
+                              allow_smaller_final_batch=True)
+
+
+    def preprocess(self, imgOri, segImgOri, isTrain):
         if isTrain:
+            # Data augmentation
             imgTrans, segImgTrans = self.random_translation(imgOri, segImgOri)      # Random translation
             imgFlip, segImgFlip = self.random_flip(imgTrans, segImgTrans)           # Random left-right flip
             imgBrit, segImgBrit = self.random_brightness(imgFlip, segImgFlip)       # Random brightness

@@ -33,13 +33,18 @@ class UNet(object):
         self.isTrain = isTrain
         self.logDir = logDir
         self.name=name
-        self.lrTB = None
+
+        self.mIoUMetric, self.mIoUMetricUpdate = None, None
+        self.tb_lr = None
 
         self.logger = logging.getLogger(__name__)  # logger
         self.logger.setLevel(logging.INFO)
         utils.init_logger(logger=self.logger, logDir=self.logDir, isTrain=self.isTrain, name=self.name)
 
-        self._build_graph()
+        self._build_graph()         # main graph
+        self._init_eval_graph()     # evaluation
+        self._init_tensorboard()    # tensorboard
+        tf_utils.show_all_variables(logger=self.logger if self.isTrain else None)
 
     def _build_graph(self):
         # Input placeholders
@@ -53,28 +58,15 @@ class UNet(object):
                              decodeImgShape=self.decodeImgShape,
                              imgShape=self.inputShape,
                              batchSize=self.batchSize,
-                             isTrain=True)
-        valReader = Reader(tfrecordsFile=self.dataPath[1],
-                           decodeImgShape=self.decodeImgShape,
-                           imgShape=self.inputShape,
-                           batchSize=self.batchSize,
-                           isTrain=False)
+                             isTrain=True,
+                             name='train')
 
-        # Random batch
+        # Random batch for training
         self.imgTrain, self.segImgTrain = trainReader.shuffle_batch()
-        self.imgVal, self.segImgVal = valReader.shuffle_batch()
 
-        # Network forward
+        # Network forward for training
         self.predTrain = self.forward_network(inputImg=self.normalize(self.imgTrain), reuse=False)
         self.predClsTrain = tf.math.argmax(self.predTrain, axis=-1)
-
-        self.predVal = self.forward_network(inputImg=self.normalize(self.imgVal), reuse=True)
-        self.predClsVal = tf.math.argmax(self.predVal, axis=-1)
-
-        # Calculate mean IoU using TensorFlow
-        self.mIoU = tf.compat.v1.metrics.mean_iou(labels=tf.squeeze(self.segImgVal),
-                                                     predictions=self.predClsVal,
-                                                     num_classes=self.numClasses)
 
         # Data loss
         self.dataLoss = tf.math.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -91,6 +83,39 @@ class UNet(object):
         # Optimizer
         self.trainOp = self.init_optimizer(loss=self.totalLoss, name='Adam')
 
+    def _init_eval_graph(self):
+        # Initialize TFRecoder reader
+        valReader = Reader(tfrecordsFile=self.dataPath[1],
+                           decodeImgShape=self.decodeImgShape,
+                           imgShape=self.inputShape,
+                           batchSize=self.batchSize,
+                           isTrain=False,
+                           name='validation')
+
+        # Batch for validation data
+        imgVal, segImgVal = valReader.batch()
+
+        # tf.train.batch() returns [None, H, M, D]
+        # For tf.metrics.mean_iou we need [batch_size, H, M, D]
+        self.imgVal = tf.reshape(imgVal, shape=[self.batchSize, *self.outputShape])
+        self.segImgVal = tf.reshape(segImgVal, shape=[self.batchSize, *self.outputShape])
+
+        # Network forward for validation data
+        self.predVal = self.forward_network(inputImg=self.normalize(self.imgVal), reuse=True)
+        self.predClsVal = tf.math.argmax(self.predVal, axis=-1)
+
+        # Calculate mean IoU using TensorFlow
+        self.mIoU_metric, self.mIoU_metric_update = tf.compat.v1.metrics.mean_iou(labels=tf.squeeze(self.segImgVal),
+                                                                                  predictions=self.predClsVal,
+                                                                                  num_classes=self.numClasses,
+                                                                                  name='mIoUMetric')
+
+        # Isolate the variables stored behind the scens by the metric operation
+        running_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES, scope='mIoUMetric')
+
+        # Define initializer to initialie/reset running variables
+        self.running_vars_initializer = tf.compat.v1.variables_initializer(var_list=running_vars)
+
     def init_optimizer(self, loss, name=None):
         with tf.compat.v1.variable_scope(name):
             globalStep = tf.Variable(0., dtype=tf.float32, trainable=False)
@@ -104,7 +129,7 @@ class UNet(object):
                                                                globalStep - startDecayStep,
                                                                decaySteps, endLearningRate, power=1.0),
                                      startLearningRate))
-            self.lrTB = tf.compat.v1.summary.scalar('learning_rate', learningRate)
+            self.tb_lr = tf.compat.v1.summary.scalar('learning_rate', learningRate)
 
             learnStep = tf.compat.v1.train.AdamOptimizer(learning_rate=learningRate, beta1=0.99).minimize(
                 loss, global_step=globalStep)
@@ -114,11 +139,14 @@ class UNet(object):
 
 
     def _init_tensorboard(self):
-        print("Hello _init_tensoboard!")
+        self.tb_total = tf.summary.scalar('Loss/total_loss', self.totalLoss)
+        self.tb_data = tf.summary.scalar('Loss/data_loss', self.dataLoss)
+        self.tb_reg = tf.summary.scalar('Loss/reg_term', self.regTerm)
+        self.summary_op = tf.summary.merge(inputs=[self.tb_total, self.tb_data, self.tb_reg, self.tb_lr])
 
-    # TODO: TensorBoard
-    def _tensorboard(self):
-        print("Hello tensorbaord!")
+    # # TODO: TensorBoard
+    # def _tensorboard(self):
+    #     print("Hello tensorbaord!")
 
     @staticmethod
     def normalize(data):

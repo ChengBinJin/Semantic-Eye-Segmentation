@@ -12,8 +12,10 @@ import utils as utils
 
 
 class Solver(object):
-    def __init__(self, model):
+    def __init__(self, model, data, batchSize):
         self.model = model
+        self.data = data
+        self.batchSize = batchSize
 
         self._init_session()
         self._init_variables()
@@ -23,7 +25,7 @@ class Solver(object):
 
     def _init_variables(self):
         self.sess.run(tf.compat.v1.global_variables_initializer())
-        self.sess.run(tf.compat.v1.local_variables_initializer())  # For tf.metrics.mean_iou
+        # self.sess.run(tf.compat.v1.local_variables_initializer())  # For tf.metrics.mean_iou
 
     def train(self):
         feed = {
@@ -34,8 +36,9 @@ class Solver(object):
         totalLoss = self.model.totalLoss
         dataLoss = self.model.dataLoss
         regTerm = self.model.regTerm
+        summary_op = self.model.summary_op
 
-        return self.sess.run([trainOp, totalLoss, dataLoss, regTerm], feed_dict=feed)
+        return self.sess.run([trainOp, totalLoss, dataLoss, regTerm, summary_op], feed_dict=feed)
 
     def sample(self, iterTime, saveDir):
         feed = {
@@ -48,11 +51,29 @@ class Solver(object):
         self.saveImgs(img, predCls, segImg, iterTime, saveDir)
 
     def eval(self):
+        print(' [*] Evaluating...')
+
+        # Calculate number of iterations for one validaiton-epoch
+        numIters = int(np.ceil(self.data.numValImgs / self.batchSize))
+
         feed = {
             self.model.ratePh: 0.  # rate: 1 - keep_prob
         }
 
-        return self.sess.run(self.model.mIoU, feed_dict=feed)
+        # Initialize/reset the running variables
+        self.sess.run(self.model.running_vars_initializer)
+
+        for iterTime in range(numIters):
+            # Update the running variables on new batch of samples
+            self.sess.run(self.model.mIoU_metric_update, feed_dict=feed)
+
+            if iterTime % 100 == 0:
+                print(' Evaluation iters: {} / {}'.format(iterTime, numIters))
+
+        # Calculate the mIoU
+        mIoU = self.sess.run(self.model.mIoU_metric)
+
+        return mIoU
 
     @staticmethod
     def saveImgs(img, predCls, segImg, iterTime, saveDir, margin=5):
