@@ -41,17 +41,16 @@ class UNet(object):
         self.logger.setLevel(logging.INFO)
         utils.init_logger(logger=self.logger, logDir=self.logDir, isTrain=self.isTrain, name=self.name)
 
-        self._build_graph()         # main graph
-        self._init_eval_graph()     # evaluation
-        self._init_tensorboard()    # tensorboard
+        self._build_graph()             # main graph
+        self._init_eval_graph()         # evaluation
+        self._best_metrics_record()     # metrics
+        self._init_tensorboard()        # tensorboard
         tf_utils.show_all_variables(logger=self.logger if self.isTrain else None)
 
     def _build_graph(self):
         # Input placeholders
         self.inputImgPh = tf.compat.v1.placeholder(tf.float32, shape=[None, *self.inputShape], name='inputPh')
         self.ratePh = tf.compat.v1.placeholder(tf.float32, name='keepProbPh')
-
-        # TODO Best acc record
 
         # Initialize TFRecoder reader
         trainReader = Reader(tfrecordsFile=self.dataPath[0],
@@ -104,17 +103,37 @@ class UNet(object):
         self.predVal = self.forward_network(inputImg=self.normalize(self.imgVal), reuse=True)
         self.predClsVal = tf.math.argmax(self.predVal, axis=-1)
 
-        # Calculate mean IoU using TensorFlow
-        self.mIoU_metric, self.mIoU_metric_update = tf.compat.v1.metrics.mean_iou(labels=tf.squeeze(self.segImgVal),
-                                                                                  predictions=self.predClsVal,
-                                                                                  num_classes=self.numClasses,
-                                                                                  name='mIoUMetric')
+        with tf.compat.v1.name_scope('Metrics'):
+            # Calculate mean IoU using TensorFlow
+            self.mIoU_metric, self.mIoU_metric_update = tf.compat.v1.metrics.mean_iou(
+                labels=tf.squeeze(self.segImgVal),
+                predictions=self.predClsVal,
+                num_classes=self.numClasses)
+
+            # Calculate accuracy using TensorFlow
+            self.accuracy_metric, self.accuracy_metric_update = tf.compat.v1.metrics.accuracy(
+                labels=tf.squeeze(self.segImgVal),
+                predictions=self.predClsVal)
 
         # Isolate the variables stored behind the scens by the metric operation
-        running_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES, scope='mIoUMetric')
+        running_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES, scope='Metrics')
 
         # Define initializer to initialie/reset running variables
         self.running_vars_initializer = tf.compat.v1.variables_initializer(var_list=running_vars)
+
+    def _best_metrics_record(self):
+        self.best_mIoU_ph = tf.compat.v1.placeholder(tf.float32, name='best_mIoU')
+        self.best_acc_ph = tf.compat.v1.placeholder(tf.float32, name='best_acc')
+
+        # Best mIoU variable
+        self.best_mIoU = tf.compat.v1.get_variable(name='best_mIoU', dtype=tf.float32, initializer=tf.constant(0.),
+                                                   trainable=False)
+        self.assign_best_mIoU = tf.assign(self.best_mIoU, value=self.best_mIoU_ph)
+
+        # Best acciracu varoab;e
+        self.best_acc = tf.compat.v1.get_variable(name='best_acc', dtype=tf.float32, initializer=tf.constant(0.),
+                                                  trainable=False)
+        self.assign_best_acc = tf.assign(self.best_acc, value=self.best_acc_ph)
 
     def init_optimizer(self, loss, name=None):
         with tf.compat.v1.variable_scope(name):
@@ -136,17 +155,15 @@ class UNet(object):
 
         return learnStep
 
-
-
     def _init_tensorboard(self):
         self.tb_total = tf.summary.scalar('Loss/total_loss', self.totalLoss)
         self.tb_data = tf.summary.scalar('Loss/data_loss', self.dataLoss)
         self.tb_reg = tf.summary.scalar('Loss/reg_term', self.regTerm)
         self.summary_op = tf.summary.merge(inputs=[self.tb_total, self.tb_data, self.tb_reg, self.tb_lr])
 
-    # # TODO: TensorBoard
-    # def _tensorboard(self):
-    #     print("Hello tensorbaord!")
+        self.tb_mIoU = tf.summary.scalar('Acc/mIoU', self.mIoU_metric)
+        self.tb_accuracy = tf.summary.scalar('Acc/accuracy', self.accuracy_metric)
+        self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy])
 
     @staticmethod
     def normalize(data):
@@ -210,8 +227,8 @@ class UNet(object):
                                              logger=self.logger)
 
             # Stage 6
-            s6_deconv1 = tf_utils.deconv2d(x=s5_conv2_drop, output_dim=self.conv_dims[10], k_h=2, k_w=2, initializer='He',
-                                           name='s6_deconv1', logger=self.logger)
+            s6_deconv1 = tf_utils.deconv2d(x=s5_conv2_drop, output_dim=self.conv_dims[10], k_h=2, k_w=2,
+                                           initializer='He', name='s6_deconv1', logger=self.logger)
             s6_deconv1 = tf_utils.relu(s6_deconv1, name='relu_s6_deconv1', logger=self.logger)
             # Cropping
             w1 = s4_conv2_drop.get_shape().as_list()[2]

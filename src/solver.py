@@ -5,6 +5,7 @@
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
 import os
+import sys
 import cv2
 import numpy as np
 import tensorflow as tf
@@ -25,7 +26,6 @@ class Solver(object):
 
     def _init_variables(self):
         self.sess.run(tf.compat.v1.global_variables_initializer())
-        # self.sess.run(tf.compat.v1.local_variables_initializer())  # For tf.metrics.mean_iou
 
     def train(self):
         feed = {
@@ -50,9 +50,7 @@ class Solver(object):
 
         self.saveImgs(img, predCls, segImg, iterTime, saveDir)
 
-    def eval(self):
-        print(' [*] Evaluating...')
-
+    def eval(self, tb_writer, iter_time):
         # Calculate number of iterations for one validaiton-epoch
         numIters = int(np.ceil(self.data.numValImgs / self.batchSize))
 
@@ -65,15 +63,37 @@ class Solver(object):
 
         for iterTime in range(numIters):
             # Update the running variables on new batch of samples
-            self.sess.run(self.model.mIoU_metric_update, feed_dict=feed)
+            self.sess.run([self.model.mIoU_metric_update, self.model.accuracy_metric_update], feed_dict=feed)
 
             if iterTime % 100 == 0:
-                print(' Evaluation iters: {} / {}'.format(iterTime, numIters))
+                msg  = "\r - Evaluating progress: {:.2f}%".format((iterTime/numIters)*100.)
+
+                # Print it.
+                sys.stdout.write(msg)
+                sys.stdout.flush()
 
         # Calculate the mIoU
-        mIoU = self.sess.run(self.model.mIoU_metric)
+        mIoU, accuracy, metric_summary_op = self.sess.run([self.model.mIoU_metric,
+                                                           self.model.accuracy_metric,
+                                                           self.model.metric_summary_op])
 
-        return mIoU
+        # Write to tensorboard
+        tb_writer.add_summary(metric_summary_op, iter_time)
+        tb_writer.flush()
+
+        return mIoU * 100., accuracy * 100.
+
+    def set_best_mIoU(self, best_mIoU):
+        self.sess.run(self.model.assign_best_mIoU, feed_dict={self.model.best_mIoU_ph: best_mIoU})
+
+    def get_best_mIoU(self):
+        return self.sess.run(self.model.best_mIoU)
+
+    def set_best_acc(self, best_acc):
+        self.sess.run(self.model.assign_best_acc, feed_dict={self.model.best_acc_ph: best_acc})
+
+    def get_best_acc(self):
+        return self.sess.run(self.model.best_acc)
 
     @staticmethod
     def saveImgs(img, predCls, segImg, iterTime, saveDir, margin=5):
