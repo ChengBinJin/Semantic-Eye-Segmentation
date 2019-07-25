@@ -56,7 +56,7 @@ class OpenEDS(object):
         if isTrain:
             return self.trainPath, self.valPath, self.overfittingPath
         else:
-            return self.testPath, None
+            return self.testPath, self.valPath, None
 
 def Dataset(name, track='Semantic_Segmentation_Dataset', isTrain=True, resizedFactor=0.5, logDir=None):
     if name == 'OpenEDS':

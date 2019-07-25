@@ -39,8 +39,8 @@ class Reader(object):
                 'image/encoded_image': tf.io.FixedLenFeature([], tf.string)})
 
             imageBuffer = features['image/encoded_image']
-            # userIdBuffer = features['image/user_id']
-            # imageNameBuffer = features['image/file_name']
+            self.userIdBuffer = features['image/user_id']
+            self.imageNameBuffer = features['image/file_name']
             image = tf.image.decode_jpeg(imageBuffer, channels=self.imgShape[2])
 
             # Resize to 2D
@@ -63,7 +63,7 @@ class Reader(object):
     def batch(self):
         img, segImg = self.preprocess(self.imgOri, self.segImgOri, self.isTrain)
 
-        return tf.train.batch(tensors=[img, segImg],
+        return tf.train.batch(tensors=[img, segImg, self.imageNameBuffer, self.userIdBuffer],
                               batch_size=self.batchSize,
                               num_threads=self.numThreads,
                               capacity=self.minQueueExamples + 3 * self.batchSize,

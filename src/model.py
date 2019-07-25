@@ -92,7 +92,7 @@ class UNet(object):
                            name='validation')
 
         # Batch for validation data
-        imgVal, segImgVal = valReader.batch()
+        imgVal, segImgVal, self.img_name, self.user_id = valReader.batch()
 
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
@@ -106,13 +106,23 @@ class UNet(object):
         with tf.compat.v1.name_scope('Metrics'):
             # Calculate mean IoU using TensorFlow
             self.mIoU_metric, self.mIoU_metric_update = tf.compat.v1.metrics.mean_iou(
-                labels=tf.squeeze(self.segImgVal),
+                labels=tf.squeeze(self.segImgVal, axis=-1),
                 predictions=self.predClsVal,
                 num_classes=self.numClasses)
 
             # Calculate accuracy using TensorFlow
             self.accuracy_metric, self.accuracy_metric_update = tf.compat.v1.metrics.accuracy(
-                labels=tf.squeeze(self.segImgVal),
+                labels=tf.squeeze(self.segImgVal, axis=-1),
+                predictions=self.predClsVal)
+
+            # Calculate precision using TensorFlow
+            self.precision_metric, self.precision_metric_update = tf.compat.v1.metrics.precision(
+                labels=tf.squeeze(self.segImgVal, axis=-1),
+                predictions=self.predClsVal)
+
+            # Calculate recall using TensorFlow
+            self.recall_metric, self.recall_metric_update = tf.compat.v1.metrics.recall(
+                labels=tf.squeeze(self.segImgVal, axis=-1),
                 predictions=self.predClsVal)
 
         # Isolate the variables stored behind the scens by the metric operation
@@ -124,16 +134,28 @@ class UNet(object):
     def _best_metrics_record(self):
         self.best_mIoU_ph = tf.compat.v1.placeholder(tf.float32, name='best_mIoU')
         self.best_acc_ph = tf.compat.v1.placeholder(tf.float32, name='best_acc')
+        self.best_precision_ph = tf.compat.v1.placeholder(tf.float32, name='best_precision')
+        self.best_recall_ph = tf.compat.v1.placeholder(tf.float32, name='best_recall')
 
         # Best mIoU variable
         self.best_mIoU = tf.compat.v1.get_variable(name='best_mIoU', dtype=tf.float32, initializer=tf.constant(0.),
                                                    trainable=False)
         self.assign_best_mIoU = tf.assign(self.best_mIoU, value=self.best_mIoU_ph)
 
-        # Best acciracu varoab;e
+        # Best acciracy variable
         self.best_acc = tf.compat.v1.get_variable(name='best_acc', dtype=tf.float32, initializer=tf.constant(0.),
                                                   trainable=False)
         self.assign_best_acc = tf.assign(self.best_acc, value=self.best_acc_ph)
+
+        # Best precision variable
+        self.best_precision = tf.compat.v1.get_variable(name='best_precision', dtype=tf.float32, initializer=tf.constant(0.),
+                                                       trainable=False)
+        self.assign_best_precision = tf.assign(self.best_precision, value=self.best_precision_ph)
+
+        # Best recall variable
+        self.best_recall = tf.compat.v1.get_variable(name='best_recall', dtype=tf.float32, initializer=tf.constant(0.),
+                                                     trainable=False)
+        self.assign_best_recall = tf.assign(self.best_recall, value=self.best_recall_ph)
 
     def init_optimizer(self, loss, name=None):
         with tf.compat.v1.variable_scope(name):
@@ -163,7 +185,10 @@ class UNet(object):
 
         self.tb_mIoU = tf.summary.scalar('Acc/mIoU', self.mIoU_metric)
         self.tb_accuracy = tf.summary.scalar('Acc/accuracy', self.accuracy_metric)
-        self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy])
+        self.tb_precision = tf.summary.scalar('Acc/precision', self.precision_metric)
+        self.tb_recall = tf.summary.scalar('Acc/recall', self.recall_metric)
+        self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
+                                                          self.tb_precision, self.tb_recall])
 
     @staticmethod
     def normalize(data):
