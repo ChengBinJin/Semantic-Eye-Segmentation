@@ -25,7 +25,7 @@ tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, defaul
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')
 tf.flags.DEFINE_float('weight_decay', 1e-4, 'weight decay for model to handle overfitting, default: 0.0001')
-tf.flags.DEFINE_integer('iters', 200,000, 'number of iterations, default: 200,000')
+tf.flags.DEFINE_integer('iters', 200000, 'number of iterations, default: 200,000')
 tf.flags.DEFINE_integer('print_freq', 20, 'print frequency for loss information, default: 20')
 tf.flags.DEFINE_integer('sample_freq', 200, 'sample frequence for checking qualitative evaluation, default: 200')
 tf.flags.DEFINE_integer('eval_freq', 2000, 'evaluation frequencey for evaluation of the batch accuracy, default: 2000')
