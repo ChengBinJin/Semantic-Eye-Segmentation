@@ -3,6 +3,8 @@ src/__pycache__/
 src/test.py
 src/log/
 src/model/
+src/val/
+src/submit/
 src/test/
 src/sample/
 debugImgs/

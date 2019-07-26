@@ -42,7 +42,7 @@ def main(_):
     else:
         curTime = FLAGS.load_model
 
-    modelDir, logDir, sampleDir, testDir = utils.make_folders(isTrain=FLAGS.is_train, curTime=curTime)
+    modelDir, logDir, sampleDir, valDir, testDir = utils.make_folders(isTrain=FLAGS.is_train, curTime=curTime)
 
     # Logger
     logger = logging.getLogger(__name__)  # logger
@@ -79,7 +79,7 @@ def main(_):
     if FLAGS.is_train is True:
         train(solver, saver, logger, modelDir, logDir, sampleDir)
     else:
-        test(solver, saver, modelDir, testDir, data)
+        test(solver, saver, modelDir, valDir, testDir, data)
 
 def train(solver, saver, logger, modelDir, logDir, sampleDir):
     best_mIoU, best_acc, best_precision, best_recall = 0., 0., 0., 0.
@@ -166,7 +166,7 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
         coord.request_stop()
         coord.join(threads)
 
-def test(solver, saver, modelDir, testDir, data):
+def test(solver, saver, modelDir, valDir, testDir, data):
     # Load checkpoint
     flag, iter_time, best_mIoU, best_acc, best_precision, best_recall = load_model(saver=saver,
                                                                                    solver=solver,
@@ -183,15 +183,17 @@ def test(solver, saver, modelDir, testDir, data):
     threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
 
     try:
-        mIoU, acc, precision, recall = solver.test(test_dir=testDir)
+        # mIoU, acc, precision, recall = solver.test_val(save_dir=valDir)
+        #
+        # print("\n")
+        # print("*" * 70)
+        # print('mIoU: {:.3f} \t\t- Best mIoU: {:.3f}'.format(mIoU, best_mIoU))
+        # print('Acc.: {:.3f} \t\t- Best Acc.: {:.3f}'.format(acc, best_acc))
+        # print("Precision: {:.3f} \t- Best Precision: {:.3f}".format(precision, best_precision))
+        # print("Recall: {:.3f} \t\t- Best Recall: {:.3f}".format(recall, best_recall))
+        # print("*" * 70)
 
-        print("\n")
-        print("*" * 70)
-        print('mIoU: {:.3f} \t\t- Best mIoU: {:.3f}'.format(mIoU, best_mIoU))
-        print('Acc.: {:.3f} \t\t- Best Acc.: {:.3f}'.format(acc, best_acc))
-        print("Precision: {:.3f} \t- Best Precision: {:.3f}".format(precision, best_precision))
-        print("Recall: {:.3f} \t\t- Best Recall: {:.3f}".format(recall, best_recall))
-        print("*" * 70)
+        solver.test_test(save_dir=testDir)
 
     except KeyboardInterrupt:
         coord.request_stop()

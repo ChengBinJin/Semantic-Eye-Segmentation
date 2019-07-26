@@ -73,7 +73,7 @@ def make_folders(isTrain=True, curTime=None):
     modelDir = os.path.join('model', '{}'.format(curTime))
     logDir = os.path.join('log', '{}'.format(curTime))
     sampleDir = os.path.join('sample', '{}'.format(curTime))
-    testDir = None
+    valDir, testDir = None, None
 
     if isTrain:
         if not os.path.isdir(modelDir):
@@ -85,12 +85,16 @@ def make_folders(isTrain=True, curTime=None):
         if not os.path.isdir(sampleDir):
             os.makedirs(sampleDir)
     else:
+        valDir = os.path.join('val', '{}'.format(curTime))
         testDir = os.path.join('test', '{}'.format(curTime))
+
+        if not os.path.isdir(valDir):
+            os.makedirs(valDir)
 
         if not os.path.isdir(testDir):
             os.makedirs(testDir)
 
-    return modelDir, logDir, sampleDir, testDir
+    return modelDir, logDir, sampleDir, valDir, testDir
 
 
 def init_logger(logger, logDir, name, isTrain):
@@ -186,3 +190,61 @@ def convert_color_label(img):
         img_rgb[img == i] = color
 
     return img_rgb
+
+
+def save_npy(data, save_dir, file_name):
+    save_dir = os.path.join(save_dir, 'npy')
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
+
+    # Extract image number from [000002342342_U23.png]
+    file_name = file_name[0].split('_')[0]
+
+    # Convert [1, H, W] to [H, W]
+    data = np.squeeze(data)
+    # Resize from [H/2, W/2] to [H, W]
+    data = cv2.resize(data, dsize=None, fx=2., fy=2, interpolation=cv2.INTER_NEAREST)
+    # Save data in npy format by requirement
+    np.save(os.path.join(save_dir, file_name), data)
+
+
+def save_imgs(img_stores, iterTime=None, saveDir=None, margin=5, img_name=None, is_vertical=True):
+    num_categories = len(img_stores)
+    for i in range(num_categories):
+        if img_stores[i].shape[-1] == 1:
+            img_stores[i] = np.squeeze(img_stores[i], axis=-1)
+
+        img_stores[i] = img_stores[i].astype(np.uint8)
+
+    numImgs, h, w = img_stores[0].shape
+
+    if is_vertical:
+        canvas = np.zeros((num_categories * h + (num_categories + 1) * margin,
+                           numImgs * w + (numImgs + 1) * margin, 3), dtype=np.uint8)
+
+        for i in range(numImgs):
+            for j in range(num_categories):
+                if j != 0:  # label map
+                    canvas[(j+1)*margin+j*h:(j+1)*margin+(j+1)*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
+                        convert_color_label(img_stores[j][i])
+                else:
+                    canvas[(j+1)*margin+j*h:(j+1)*margin+(j+1)*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
+                        np.dstack((img_stores[j][i], img_stores[j][i], img_stores[j][i]))
+
+    else:
+        canvas = np.zeros((numImgs * h + (numImgs + 1) * margin,
+                           num_categories * w + (num_categories + 1) * margin, 3), dtype=np.uint8)
+
+        for i in range(numImgs):
+            for j in range(num_categories):
+                if j != 0:
+                    canvas[(i+1)*margin+i*h:(i+1)*(margin+h), (j+1)*margin+j*w:(j+1)*margin+(j+1)*w, :] = \
+                        convert_color_label(img_stores[j][i])
+                else:
+                    canvas[(i+1)*margin+i*h:(i+1)*(margin+h), (j+1)*margin+j*w:(j+1)*margin+(j+1)*w, :] = \
+                        np.dstack((img_stores[j][i], img_stores[j][i], img_stores[j][i]))
+
+    if img_name is None:
+        cv2.imwrite(os.path.join(saveDir, str(iterTime).zfill(6) + '.png'), canvas)
+    else:
+        cv2.imwrite(os.path.join(saveDir, img_name[0]), canvas)

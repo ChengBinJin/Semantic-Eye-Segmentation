@@ -82,9 +82,10 @@ class Solver(object):
 
         return mIoU, accuracy, precision, recall
 
-    def test(self, test_dir):
+    def test_val(self, save_dir):
         # Calculate number of iterations for one validaiton-epoch
         numIters = int(np.ceil(self.data.numValImgs / self.batchSize))
+        print(' [*] Validation dataset')
         print('Batch size: {}, Number of iterations: {}'.format(self.batchSize, numIters))
 
         run_ops = [self.model.mIoU_metric_update,
@@ -94,8 +95,8 @@ class Solver(object):
                    self.model.imgVal,
                    self.model.predClsVal,
                    self.model.segImgVal,
-                   self.model.img_name,
-                   self.model.user_id]
+                   self.model.img_name_val,
+                   self.model.user_id_val]
 
         feed = {
             self.model.ratePh: 0.  # rate: 1 - keep_prob
@@ -109,7 +110,10 @@ class Solver(object):
             _, _, _, _, img, predCls, segImg, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
 
             # Save images
-            self.saveImgs(img, predCls, segImg, saveDir=test_dir, img_name=img_name.astype('U26'), is_vertical=False)
+            utils.save_imgs(img_stores=[img, predCls, segImg],
+                            saveDir=save_dir,
+                            img_name=img_name.astype('U26'),
+                            is_vertical=False)
 
             if iterTime % 100 == 0:
                 print("- Evaluating progress: {:.2f}%".format((iterTime/numIters)*100.))
@@ -127,6 +131,38 @@ class Solver(object):
         recall *= 100.
 
         return mIoU, accuracy, precision, recall
+    
+    def test_test(self, save_dir):
+        # Calculate number of iterations for one validaiton-epoch
+        numIters = int(np.ceil(self.data.numTestImgs / self.batchSize))
+        print(' [*] Test dataset')
+        print('Batch size: {}, Number of iterations: {}'.format(self.batchSize, numIters))
+
+        run_ops = [self.model.imgTest,
+                   self.model.predClsTest,
+                   self.model.img_name_test,
+                   self.model.user_id_test]
+
+        feed = {
+            self.model.ratePh: 0.  # rate: 1 - keep_prob
+        }
+
+        for iterTime in range(numIters):
+            img, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+
+            # Save images
+            utils.save_imgs(img_stores=[img, predCls],
+                            saveDir=save_dir,
+                            img_name=img_name.astype('U26'),
+                            is_vertical=False)
+
+            # Write as npy format
+            utils.save_npy(data=predCls,
+                           save_dir=save_dir,
+                           file_name=img_name.astype('U26'))
+
+            if iterTime % 100 == 0:
+                print("- Evaluating progress: {:.2f}%".format((iterTime/numIters)*100.))
 
     def sample(self, iterTime, saveDir):
         feed = {
@@ -136,7 +172,10 @@ class Solver(object):
         img, predCls, segImg = self.sess.run([self.model.imgTrain, self.model.predClsTrain, self.model.segImgTrain],
                                              feed_dict=feed)
 
-        self.saveImgs(img, predCls, segImg, iterTime=iterTime, saveDir=saveDir, is_vertical=True)
+        utils.save_imgs(img_stores=[img, predCls, segImg],
+                        iterTime=iterTime,
+                        saveDir=saveDir,
+                        is_vertical=True)
 
     def set_best_mIoU(self, best_mIoU):
         self.sess.run(self.model.assign_best_mIoU, feed_dict={self.model.best_mIoU_ph: best_mIoU})
@@ -162,36 +201,53 @@ class Solver(object):
     def get_best_recall(self):
         return self.sess.run(self.model.best_recall)
 
-    @staticmethod
-    def saveImgs(img, predCls, segImg, iterTime=None, saveDir=None, margin=5, img_name=None, is_vertical=True):
-        img = np.squeeze(img, axis=-1).astype(np.uint8)         # [N, H, W, 1)
-        predCls = predCls.astype(np.uint8)                      # [N, H, W]
-        segImgs = np.squeeze(segImg, axis=-1).astype(np.uint8)  # [N, H, W, 1]
+    # @staticmethod
+    # def saveImgs(img, predCls, segImg, iterTime=None, saveDir=None, margin=5, img_name=None, is_vertical=True):
+    #     img = np.squeeze(img, axis=-1).astype(np.uint8)         # [N, H, W, 1)
+    #     predCls = predCls.astype(np.uint8)                      # [N, H, W]
+    #     segImgs = np.squeeze(segImg, axis=-1).astype(np.uint8)  # [N, H, W, 1]
+    #
+    #     numImgs, h, w = img.shape
+    #
+    #     if is_vertical:
+    #         canvas = np.zeros((3 * h + 4 * margin, numImgs * w + (numImgs + 1) * margin, 3), dtype=np.uint8)
+    #
+    #         for i in range(numImgs):
+    #             canvas[margin:margin+h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
+    #                 np.dstack((img[i], img[i], img[i]))
+    #             canvas[2*margin+h:2*margin+2*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
+    #                 utils.convert_color_label(predCls[i])
+    #             canvas[3*margin+2*h:3*margin+3*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
+    #                 utils.convert_color_label(segImgs[i])
+    #     else:
+    #         canvas = np.zeros((numImgs * h + (numImgs + 1) * margin, 3 * w + 4 * margin, 3), dtype=np.uint8)
+    #
+    #         for i in range(numImgs):
+    #             canvas[(i+1)*margin+i*h:(i+1)*(margin+h), margin:margin+w, :] = \
+    #                 np.dstack((img[i], img[i], img[i]))
+    #             canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 2*margin+w:2*margin+2*w, :] = \
+    #                 utils.convert_color_label(predCls[i])
+    #             canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 3*margin+2*w:3*margin+3*w, :] = \
+    #                 utils.convert_color_label(segImgs[i])
+    #
+    #     if img_name is None:
+    #         cv2.imwrite(os.path.join(saveDir, str(iterTime).zfill(6)+'.png'), canvas)
+    #     else:
+    #         cv2.imwrite(os.path.join(saveDir, img_name[0] + '.png'), canvas)
 
-        numImgs, h, w = img.shape
 
-        if is_vertical:
-            canvas = np.zeros((3 * h + 4 * margin, numImgs * w + (numImgs + 1) * margin, 3), dtype=np.uint8)
-
-            for i in range(numImgs):
-                canvas[margin:margin+h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
-                    np.dstack((img[i], img[i], img[i]))
-                canvas[2*margin+h:2*margin+2*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
-                    utils.convert_color_label(predCls[i])
-                canvas[3*margin+2*h:3*margin+3*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
-                    utils.convert_color_label(segImgs[i])
-        else:
-            canvas = np.zeros((numImgs * h + (numImgs + 1) * margin, 3 * w + 4 * margin, 3), dtype=np.uint8)
-
-            for i in range(numImgs):
-                canvas[(i+1)*margin+i*h:(i+1)*(margin+h), margin:margin+w, :] = \
-                    np.dstack((img[i], img[i], img[i]))
-                canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 2*margin+w:2*margin+2*w, :] = \
-                    utils.convert_color_label(predCls[i])
-                canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 3*margin+2*w:3*margin+3*w, :] = \
-                    utils.convert_color_label(segImgs[i])
-
-        if img_name is None:
-            cv2.imwrite(os.path.join(saveDir, str(iterTime).zfill(6)+'.png'), canvas)
-        else:
-            cv2.imwrite(os.path.join(saveDir, img_name[0] + '.png'), canvas)
+    # @staticmethod
+    # def save_test_results(img, predCls, saveDir=None, margin=5, img_name=None):
+    #     img = np.squeeze(img, axis=-1).astype(np.uint8)         # [N, H, W, 1)
+    #     predCls = predCls.astype(np.uint8)                      # [N, H, W]
+    #
+    #     numImgs, h, w = img.shape
+    #     canvas = np.zeros((numImgs * h + (numImgs + 1) * margin, 2 * w + 3 * margin, 3), dtype=np.uint8)
+    #
+    #     for i in range(numImgs):
+    #         canvas[(i+1)*margin+i*h:(i+1)*(margin+h), margin:margin+w, :] = \
+    #             np.dstack((img[i], img[i], img[i]))
+    #         canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 2*margin+w:2*margin+2*w, :] = \
+    #             utils.convert_color_label(predCls[i])
+    #
+    #     cv2.imwrite(os.path.join(saveDir, img_name[0] + '.png'), canvas)

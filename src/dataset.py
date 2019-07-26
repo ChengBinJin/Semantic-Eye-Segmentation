@@ -14,7 +14,7 @@ class OpenEDS(object):
         self.track = track
 
         self.numTrainImgs = 8916
-        self.numValImgs = 2430
+        self.numValImgs = 2403
         self.numTestImgs = 1440
 
         self.numTrainPersons = 95

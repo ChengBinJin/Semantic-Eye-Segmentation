@@ -42,7 +42,8 @@ class UNet(object):
         utils.init_logger(logger=self.logger, logDir=self.logDir, isTrain=self.isTrain, name=self.name)
 
         self._build_graph()             # main graph
-        self._init_eval_graph()         # evaluation
+        self._init_eval_graph()         # evaluation for validation data
+        self._init_test_graph()         # for test data
         self._best_metrics_record()     # metrics
         self._init_tensorboard()        # tensorboard
         tf_utils.show_all_variables(logger=self.logger if self.isTrain else None)
@@ -92,7 +93,7 @@ class UNet(object):
                            name='validation')
 
         # Batch for validation data
-        imgVal, segImgVal, self.img_name, self.user_id = valReader.batch()
+        imgVal, segImgVal, self.img_name_val, self.user_id_val = valReader.batch()
 
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
@@ -130,6 +131,22 @@ class UNet(object):
 
         # Define initializer to initialie/reset running variables
         self.running_vars_initializer = tf.compat.v1.variables_initializer(var_list=running_vars)
+
+    def _init_test_graph(self):
+        # Initialize TFRecoder reader
+        testReader = Reader(tfrecordsFile=self.dataPath[0],
+                            decodeImgShape=self.decodeImgShape,
+                            imgShape=self.inputShape,
+                            batchSize=self.batchSize,
+                            isTrain=False,
+                            name='test')
+
+        # Batch for validation data
+        self.imgTest, _, self.img_name_test, self.user_id_test = testReader.batch()
+
+        # Network forward for validation data
+        self.predTest = self.forward_network(inputImg=self.normalize(self.imgTest), reuse=True)
+        self.predClsTest = tf.math.argmax(self.predTest, axis=-1)
 
     def _best_metrics_record(self):
         self.best_mIoU_ph = tf.compat.v1.placeholder(tf.float32, name='best_mIoU')
