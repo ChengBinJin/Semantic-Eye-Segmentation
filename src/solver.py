@@ -4,19 +4,16 @@
 # Written by Cheng-Bin Jin
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
-import os
 import sys
-import cv2
 import numpy as np
 import tensorflow as tf
 import utils as utils
 
 
 class Solver(object):
-    def __init__(self, model, data, batchSize):
+    def __init__(self, model, data):
         self.model = model
         self.data = data
-        self.batchSize = batchSize
 
         self._init_session()
         self._init_variables()
@@ -40,53 +37,10 @@ class Solver(object):
 
         return self.sess.run([trainOp, totalLoss, dataLoss, regTerm, summary_op], feed_dict=feed)
 
-    def eval(self, tb_writer=None, iter_time=None):
+    def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_test=False):
         # Calculate number of iterations for one validaiton-epoch
-        numIters = int(np.ceil(self.data.numValImgs / self.batchSize))
-
-        feed = {
-            self.model.ratePh: 0.  # rate: 1 - keep_prob
-        }
-
-        # Initialize/reset the running variables
-        self.sess.run(self.model.running_vars_initializer)
-
-        for iterTime in range(numIters):
-            # Update the running variables on new batch of samples
-            self.sess.run([self.model.mIoU_metric_update,
-                           self.model.accuracy_metric_update,
-                           self.model.precision_metric_update,
-                           self.model.recall_metric_update], feed_dict=feed)
-
-            if iterTime % 100 == 0:
-                msg  = "\r - Evaluating progress: {:.2f}%".format((iterTime/numIters)*100.)
-
-                # Print it.
-                sys.stdout.write(msg)
-                sys.stdout.flush()
-
-        # Calculate the mIoU
-        mIoU, accuracy, precision, recall, metric_summary_op = self.sess.run([self.model.mIoU_metric,
-                                                                              self.model.accuracy_metric,
-                                                                              self.model.precision_metric,
-                                                                              self.model.recall_metric,
-                                                                              self.model.metric_summary_op])
-        # Write to tensorboard
-        tb_writer.add_summary(metric_summary_op, iter_time)
-        tb_writer.flush()
-
-        mIoU *= 100.
-        accuracy *= 100.
-        precision *= 100.
-        recall *= 100.
-
-        return mIoU, accuracy, precision, recall
-
-    def test_val(self, save_dir):
-        # Calculate number of iterations for one validaiton-epoch
-        numIters = int(np.ceil(self.data.numValImgs / self.batchSize))
-        print(' [*] Validation dataset')
-        print('Batch size: {}, Number of iterations: {}'.format(self.batchSize, numIters))
+        print(' [*] Validation dataset ...')
+        print('Number of iterations: {}'.format(self.data.numValImgs))
 
         run_ops = [self.model.mIoU_metric_update,
                    self.model.accuracy_metric_update,
@@ -105,18 +59,23 @@ class Solver(object):
         # Initialize/reset the running variables
         self.sess.run(self.model.running_vars_initializer)
 
-        for iterTime in range(numIters):
+        for iterTime in range(self.data.numValImgs):
             # Update the running variables on new batch of samples
             _, _, _, _, img, predCls, segImg, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
 
-            # Save images
-            utils.save_imgs(img_stores=[img, predCls, segImg],
-                            saveDir=save_dir,
-                            img_name=img_name.astype('U26'),
-                            is_vertical=False)
-
             if iterTime % 100 == 0:
-                print("- Evaluating progress: {:.2f}%".format((iterTime/numIters)*100.))
+                msg  = "\r - Evaluating progress: {:.2f}%".format((iterTime/self.data.numValImgs)*100.)
+
+                # Print it.
+                sys.stdout.write(msg)
+                sys.stdout.flush()
+
+            if is_test:
+                # Save images
+                utils.save_imgs(img_stores=[img, predCls, segImg],
+                                    saveDir=save_dir,
+                                    img_name=img_name.astype('U26'),
+                                    is_vertical=False)
 
         # Calculate the mIoU
         mIoU, accuracy, precision, recall, metric_summary_op = self.sess.run([self.model.mIoU_metric,
@@ -124,6 +83,10 @@ class Solver(object):
                                                                               self.model.precision_metric,
                                                                               self.model.recall_metric,
                                                                               self.model.metric_summary_op])
+
+        # Write to tensorboard
+        tb_writer.add_summary(metric_summary_op, iter_time)
+        tb_writer.flush()
 
         mIoU *= 100.
         accuracy *= 100.
@@ -134,9 +97,7 @@ class Solver(object):
     
     def test_test(self, save_dir):
         # Calculate number of iterations for one validaiton-epoch
-        numIters = int(np.ceil(self.data.numTestImgs / self.batchSize))
-        print(' [*] Test dataset')
-        print('Batch size: {}, Number of iterations: {}'.format(self.batchSize, numIters))
+        print('Number of iterations: {}'.format(self.data.numTestImgs))
 
         run_ops = [self.model.imgTest,
                    self.model.predClsTest,
@@ -147,7 +108,7 @@ class Solver(object):
             self.model.ratePh: 0.  # rate: 1 - keep_prob
         }
 
-        for iterTime in range(numIters):
+        for iterTime in range(self.data.numTestImgs):
             img, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
 
             # Save images
@@ -162,7 +123,7 @@ class Solver(object):
                            file_name=img_name.astype('U26'))
 
             if iterTime % 100 == 0:
-                print("- Evaluating progress: {:.2f}%".format((iterTime/numIters)*100.))
+                print("- Evaluating progress: {:.2f}%".format((iterTime/self.data.numTestImgs)*100.))
 
     def sample(self, iterTime, saveDir):
         feed = {
@@ -200,54 +161,3 @@ class Solver(object):
 
     def get_best_recall(self):
         return self.sess.run(self.model.best_recall)
-
-    # @staticmethod
-    # def saveImgs(img, predCls, segImg, iterTime=None, saveDir=None, margin=5, img_name=None, is_vertical=True):
-    #     img = np.squeeze(img, axis=-1).astype(np.uint8)         # [N, H, W, 1)
-    #     predCls = predCls.astype(np.uint8)                      # [N, H, W]
-    #     segImgs = np.squeeze(segImg, axis=-1).astype(np.uint8)  # [N, H, W, 1]
-    #
-    #     numImgs, h, w = img.shape
-    #
-    #     if is_vertical:
-    #         canvas = np.zeros((3 * h + 4 * margin, numImgs * w + (numImgs + 1) * margin, 3), dtype=np.uint8)
-    #
-    #         for i in range(numImgs):
-    #             canvas[margin:margin+h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
-    #                 np.dstack((img[i], img[i], img[i]))
-    #             canvas[2*margin+h:2*margin+2*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
-    #                 utils.convert_color_label(predCls[i])
-    #             canvas[3*margin+2*h:3*margin+3*h, (i+1)*margin+i*w:(i+1)*(margin+w), :] = \
-    #                 utils.convert_color_label(segImgs[i])
-    #     else:
-    #         canvas = np.zeros((numImgs * h + (numImgs + 1) * margin, 3 * w + 4 * margin, 3), dtype=np.uint8)
-    #
-    #         for i in range(numImgs):
-    #             canvas[(i+1)*margin+i*h:(i+1)*(margin+h), margin:margin+w, :] = \
-    #                 np.dstack((img[i], img[i], img[i]))
-    #             canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 2*margin+w:2*margin+2*w, :] = \
-    #                 utils.convert_color_label(predCls[i])
-    #             canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 3*margin+2*w:3*margin+3*w, :] = \
-    #                 utils.convert_color_label(segImgs[i])
-    #
-    #     if img_name is None:
-    #         cv2.imwrite(os.path.join(saveDir, str(iterTime).zfill(6)+'.png'), canvas)
-    #     else:
-    #         cv2.imwrite(os.path.join(saveDir, img_name[0] + '.png'), canvas)
-
-
-    # @staticmethod
-    # def save_test_results(img, predCls, saveDir=None, margin=5, img_name=None):
-    #     img = np.squeeze(img, axis=-1).astype(np.uint8)         # [N, H, W, 1)
-    #     predCls = predCls.astype(np.uint8)                      # [N, H, W]
-    #
-    #     numImgs, h, w = img.shape
-    #     canvas = np.zeros((numImgs * h + (numImgs + 1) * margin, 2 * w + 3 * margin, 3), dtype=np.uint8)
-    #
-    #     for i in range(numImgs):
-    #         canvas[(i+1)*margin+i*h:(i+1)*(margin+h), margin:margin+w, :] = \
-    #             np.dstack((img[i], img[i], img[i]))
-    #         canvas[(i+1)*margin+i*h:(i+1)*(margin+h), 2*margin+w:2*margin+2*w, :] = \
-    #             utils.convert_color_label(predCls[i])
-    #
-    #     cv2.imwrite(os.path.join(saveDir, img_name[0] + '.png'), canvas)

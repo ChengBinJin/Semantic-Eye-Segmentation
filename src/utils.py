@@ -4,7 +4,6 @@
 # Written by Cheng-Bin Jin
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
-
 import os
 import json
 import logging
@@ -73,7 +72,8 @@ def make_folders(isTrain=True, curTime=None):
     modelDir = os.path.join('model', '{}'.format(curTime))
     logDir = os.path.join('log', '{}'.format(curTime))
     sampleDir = os.path.join('sample', '{}'.format(curTime))
-    valDir, testDir = None, None
+    valDir = os.path.join('val', '{}'.format(curTime))
+    testDir = None
 
     if isTrain:
         if not os.path.isdir(modelDir):
@@ -84,12 +84,11 @@ def make_folders(isTrain=True, curTime=None):
 
         if not os.path.isdir(sampleDir):
             os.makedirs(sampleDir)
-    else:
-        valDir = os.path.join('val', '{}'.format(curTime))
-        testDir = os.path.join('test', '{}'.format(curTime))
 
         if not os.path.isdir(valDir):
             os.makedirs(valDir)
+    else:
+        testDir = os.path.join('test', '{}'.format(curTime))
 
         if not os.path.isdir(testDir):
             os.makedirs(testDir)
@@ -154,7 +153,11 @@ def print_main_parameters(logger, flags, isTrain=False):
 
 
 def all_files_under(folder, subfolder='images', endswith='.png'):
-    new_folder = os.path.join(folder, subfolder)
+    if subfolder is not None:
+        new_folder = os.path.join(folder, subfolder)
+    else:
+        new_folder = folder
+
     file_names =  [os.path.join(new_folder, fname)
                    for fname in os.listdir(new_folder) if fname.endswith(endswith)]
 
@@ -202,8 +205,13 @@ def save_npy(data, save_dir, file_name):
 
     # Convert [1, H, W] to [H, W]
     data = np.squeeze(data)
+
     # Resize from [H/2, W/2] to [H, W]
     data = cv2.resize(data, dsize=None, fx=2., fy=2, interpolation=cv2.INTER_NEAREST)
+
+    # Convert data type from int32 to uint8
+    data = data.astype(np.uint8)
+
     # Save data in npy format by requirement
     np.save(os.path.join(save_dir, file_name), data)
 

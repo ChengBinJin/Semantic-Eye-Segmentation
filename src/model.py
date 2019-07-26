@@ -20,8 +20,11 @@ class UNet(object):
         self.inputShape = outputShape
         self.outputShape = outputShape
         self.numClasses = numClasses
-        self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
-                          512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64, self.numClasses]
+        # self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
+        #                   512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64, self.numClasses]
+
+        self.conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
+                          256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32, self.numClasses]
 
         self.dataPath = dataPath
         self.batchSize = batchSize
@@ -88,7 +91,7 @@ class UNet(object):
         valReader = Reader(tfrecordsFile=self.dataPath[1],
                            decodeImgShape=self.decodeImgShape,
                            imgShape=self.inputShape,
-                           batchSize=self.batchSize,
+                           batchSize=1,
                            isTrain=False,
                            name='validation')
 
@@ -97,8 +100,8 @@ class UNet(object):
 
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
-        self.imgVal = tf.reshape(imgVal, shape=[self.batchSize, *self.outputShape])
-        self.segImgVal = tf.reshape(segImgVal, shape=[self.batchSize, *self.outputShape])
+        self.imgVal = tf.reshape(imgVal, shape=[1, *self.outputShape])
+        self.segImgVal = tf.reshape(segImgVal, shape=[1, *self.outputShape])
 
         # Network forward for validation data
         self.predVal = self.forward_network(inputImg=self.normalize(self.imgVal), reuse=True)
@@ -137,7 +140,7 @@ class UNet(object):
         testReader = Reader(tfrecordsFile=self.dataPath[0],
                             decodeImgShape=self.decodeImgShape,
                             imgShape=self.inputShape,
-                            batchSize=self.batchSize,
+                            batchSize=1,
                             isTrain=False,
                             name='test')
 

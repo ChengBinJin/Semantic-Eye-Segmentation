@@ -20,14 +20,14 @@ FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
 tf.flags.DEFINE_string('method', 'U-Net', 'Segmentation model [U-Net, VAE], default: U-Net')
-tf.flags.DEFINE_integer('batch_size', 16, 'batch size for one iteration, default: 16')
+tf.flags.DEFINE_integer('batch_size', 32, 'batch size for one iteration, default: 16')
 tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')
 tf.flags.DEFINE_float('weight_decay', 1e-4, 'weight decay for model to handle overfitting, default: 0.0001')
-tf.flags.DEFINE_integer('iters', 200000, 'number of iterations, default: 200,000')
-tf.flags.DEFINE_integer('print_freq', 10, 'print frequency for loss information, default: 10')
-tf.flags.DEFINE_integer('sample_freq', 100, 'sample frequence for checking qualitative evaluation, default: 100')
+tf.flags.DEFINE_integer('iters', 200,000, 'number of iterations, default: 200,000')
+tf.flags.DEFINE_integer('print_freq', 20, 'print frequency for loss information, default: 20')
+tf.flags.DEFINE_integer('sample_freq', 200, 'sample frequence for checking qualitative evaluation, default: 200')
 tf.flags.DEFINE_integer('eval_freq', 2000, 'evaluation frequencey for evaluation of the batch accuracy, default: 2000')
 tf.flags.DEFINE_string('load_model', None, 'folder of saved model taht you wish to continue training '
                                            '(e.g. 20190719-1409), default: None')
@@ -60,7 +60,7 @@ def main(_):
                      outputShape=data.singleImgShape,
                      numClasses=data.numClasses,
                      dataPath=data(isTrain=FLAGS.is_train),
-                     batchSize=FLAGS.batch_size if FLAGS.is_train else 1,
+                     batchSize=FLAGS.batch_size,
                      lr=FLAGS.learning_rate,
                      weightDecay=FLAGS.weight_decay,
                      totalIters=FLAGS.iters,
@@ -70,18 +70,17 @@ def main(_):
 
     # Initialize solver
     solver = Solver(model=model,
-                    data=data,
-                    batchSize=FLAGS.batch_size if FLAGS.is_train else 1)
+                    data=data)
 
     # Initialize saver
     saver = tf.compat.v1.train.Saver(max_to_keep=1)
 
     if FLAGS.is_train is True:
-        train(solver, saver, logger, modelDir, logDir, sampleDir)
+        train(solver, saver, logger, modelDir, logDir, sampleDir, valDir)
     else:
-        test(solver, saver, modelDir, valDir, testDir, data)
+        test(solver, saver, modelDir, testDir, data)
 
-def train(solver, saver, logger, modelDir, logDir, sampleDir):
+def train(solver, saver, logger, modelDir, logDir, sampleDir, valDir):
     best_mIoU, best_acc, best_precision, best_recall = 0., 0., 0., 0.
     iterTime = 0
 
@@ -125,7 +124,7 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
                 solver.sample(iterTime, sampleDir)
 
             # Evaluat models using validation dataset
-            if (iterTime % FLAGS.eval_freq == 0) or (iterTime + 1 == FLAGS.iters):
+            if (iterTime % FLAGS.eval_freq) == 0 or (iterTime + 1 == FLAGS.iters):
                 mIoU, acc, precision, recall = solver.eval(tb_writer=tb_writer, iter_time=iterTime)
 
                 if best_acc < acc:
@@ -155,6 +154,8 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
 
             iterTime += 1
 
+        solver.eval(tb_writer=tb_writer, iter_time=iterTime, save_dir=valDir, is_test=True)
+
     except KeyboardInterrupt:
         coord.request_stop()
     except Exception as e:
@@ -166,7 +167,7 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
         coord.request_stop()
         coord.join(threads)
 
-def test(solver, saver, modelDir, valDir, testDir, data):
+def test(solver, saver, modelDir, testDir, data):
     # Load checkpoint
     flag, iter_time, best_mIoU, best_acc, best_precision, best_recall = load_model(saver=saver,
                                                                                    solver=solver,
