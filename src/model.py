@@ -196,9 +196,9 @@ class UNet(object):
 
         ################################################################################################################
         # # Best f1_score variable
-        # self.best_f1_score = tf.compat.v1.get_variable(name='best_f1_score', dtype=tf.float32, initializer=tf.constant(0.),
-        #                                                trainable=False)
-        # self.assign_best_f1_score = tf.assign(self.best_f1_score, value=self.best_f1_score_ph)
+        self.best_f1_score = tf.compat.v1.get_variable(name='best_f1_score', dtype=tf.float32, initializer=tf.constant(0.),
+                                                       trainable=False)
+        self.assign_best_f1_score = tf.assign(self.best_f1_score, value=self.best_f1_score_ph)
         ################################################################################################################
 
     def init_optimizer(self, loss, name=None):
@@ -233,12 +233,12 @@ class UNet(object):
         self.tb_recall = tf.summary.scalar('Acc/recall', self.recall_metric)
 
         ################################################################################################################
-        # self.tb_f1_score = tf.summary.scalar('Acc/f1_score', self.f1_score_metric)
-        # self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
-        #                                                   self.tb_precision, self.tb_recall, self.tb_f1_score])
-
+        self.tb_f1_score = tf.summary.scalar('Acc/f1_score', self.f1_score_metric)
         self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
-                                                          self.tb_precision, self.tb_recall])
+                                                          self.tb_precision, self.tb_recall, self.tb_f1_score])
+
+        # self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
+        #                                                   self.tb_precision, self.tb_recall])
 
         ################################################################################################################
 
