@@ -19,18 +19,18 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
-tf.flags.DEFINE_string('method', 'U-Net',
-                       'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2], default: U-Net')
+tf.flags.DEFINE_string('method', 'U-Net-light-v1',
+                       'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2], default: U-Net-light-v1')
 tf.flags.DEFINE_bool('multi_test', False, 'multiple rotation feedforwards for test stage, default: False')
-tf.flags.DEFINE_integer('batch_size', 4, 'batch size for one iteration, default: 16')
+tf.flags.DEFINE_integer('batch_size', 32, 'batch size for one iteration, default: 32')
 tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')
 tf.flags.DEFINE_float('weight_decay', 1e-4, 'weight decay for model to handle overfitting, default: 0.0001')
-tf.flags.DEFINE_integer('iters', 20, 'number of iterations, default: 200,000')
-tf.flags.DEFINE_integer('print_freq', 2, 'print frequency for loss information, default: 20')
-tf.flags.DEFINE_integer('sample_freq', 2, 'sample frequence for checking qualitative evaluation, default: 200')
-tf.flags.DEFINE_integer('eval_freq', 10, 'evaluation frequencey for evaluation of the batch accuracy, default: 2000')
+tf.flags.DEFINE_integer('iters', 200000, 'number of iterations, default: 200000')
+tf.flags.DEFINE_integer('print_freq', 50, 'print frequency for loss information, default: 50')
+tf.flags.DEFINE_integer('sample_freq', 500, 'sample frequence for checking qualitative evaluation, default: 500')
+tf.flags.DEFINE_integer('eval_freq', 2000, 'evaluation frequencey for evaluation of the batch accuracy, default: 2000')
 tf.flags.DEFINE_string('load_model', None, 'folder of saved model taht you wish to continue training '
                                            '(e.g. 20190719-1409), default: None')
 
@@ -183,7 +183,7 @@ def test(solver, saver, modelDir, valDir, testDir, data):
     if flag is True:
         print(' [!] Load Success! Iter: {}, Best mIoU: {:.3f}'.format(iter_time, best_mIoU))
     else:
-        exit(' [!] Load Failed! Can not find model {}'.format(FLAGS.load_model))
+        exit(' [!] Load Failed! Can not find model {}'.format(os.path.join(modelDir)))
 
     # Threads for tfrecord
     coord = tf.train.Coordinator()

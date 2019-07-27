@@ -60,6 +60,9 @@ def create_json_from_npy_data(dataset_filename, json_filename, num_model_params=
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Script to create submission JSON file for OpenEDS competition held on EvalAI platform.")
+    parser.add_argument("--method", type=str, dest="method",
+                        help="Select a method from [U-Net, U-Net-light-v1, U-Net-light-v2]",
+                        default="U-Net-light-v1")
     parser.add_argument("--list-file", type=str, dest="list_file",
                         help="Path to text file containing list of FULL FILEPATH of labels saved in .npy format", 
                         default=None)
@@ -83,8 +86,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Modification
-    list_file = os.path.join('submit', args.list_file, 'pred_npy_list.txt')
-    submission_json = os.path.join('submit', args.list_file, args.submission_json + '.json')
+    list_file = os.path.join('submit', args.method, args.list_file, 'pred_npy_list.txt')
+    submission_json = os.path.join('submit', args.method, args.list_file, args.submission_json + '.json')
 
     # create_json_from_npy_data(args.list_file, args.submission_json, args.num_model_param)
     create_json_from_npy_data(list_file, submission_json, args.num_model_param)
