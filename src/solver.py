@@ -38,10 +38,6 @@ class Solver(object):
         return self.sess.run([trainOp, totalLoss, dataLoss, regTerm, summary_op], feed_dict=feed)
 
     def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_test=False):
-        # Calculate number of iterations for one validaiton-epoch
-        print(' [*] Validation dataset ...')
-        print('Number of iterations: {}'.format(self.data.numValImgs))
-
         run_ops = [self.model.mIoU_metric_update,
                    self.model.accuracy_metric_update,
                    self.model.precision_metric_update,
@@ -96,7 +92,6 @@ class Solver(object):
         return mIoU, accuracy, precision, recall
     
     def test_test(self, save_dir):
-        # Calculate number of iterations for one validaiton-epoch
         print('Number of iterations: {}'.format(self.data.numTestImgs))
 
         run_ops = [self.model.imgTest,

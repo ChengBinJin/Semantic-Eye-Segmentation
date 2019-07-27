@@ -68,11 +68,11 @@ class SSData(object):
         return data, userId, imgName
 
 
-def make_folders(isTrain=True, curTime=None):
-    modelDir = os.path.join('model', '{}'.format(curTime))
-    logDir = os.path.join('log', '{}'.format(curTime))
-    sampleDir = os.path.join('sample', '{}'.format(curTime))
-    valDir = os.path.join('val', '{}'.format(curTime))
+def make_folders(isTrain=True, curTime=None, subfolder=None):
+    modelDir = os.path.join('model', subfolder, '{}'.format(curTime))
+    logDir = os.path.join('log', subfolder, '{}'.format(curTime))
+    sampleDir = os.path.join('sample', subfolder, '{}'.format(curTime))
+    valDir = os.path.join('val', subfolder, '{}'.format(curTime))
     testDir = None
 
     if isTrain:
@@ -88,7 +88,7 @@ def make_folders(isTrain=True, curTime=None):
         if not os.path.isdir(valDir):
             os.makedirs(valDir)
     else:
-        testDir = os.path.join('test', '{}'.format(curTime))
+        testDir = os.path.join('test', subfolder, '{}'.format(curTime))
 
         if not os.path.isdir(testDir):
             os.makedirs(testDir)

@@ -15,16 +15,24 @@ from reader import Reader
 class UNet(object):
     def __init__(self, decodeImgShape=(320, 400, 1), outputShape=(320, 200, 1), numClasses=4,
                  dataPath=(None, None), batchSize=1, lr=1e-3, weightDecay=1e-4, totalIters=2e5, isTrain=True,
-                 logDir=None, name='UNet'):
+                 logDir=None, method=None, name='UNet'):
         self.decodeImgShape = decodeImgShape
         self.inputShape = outputShape
         self.outputShape = outputShape
         self.numClasses = numClasses
-        # self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
-        #                   512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64, self.numClasses]
+        self.method = method
 
-        self.conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
-                          256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32, self.numClasses]
+        if self.method == 'U-Net':
+            self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
+                              512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64, self.numClasses]
+        elif self.method == 'U-Net-light-v1':
+            self.conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
+                              256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32, self.numClasses]
+        elif self.method == 'U-Net-light-v2':  # U-Net-light-v2
+            self.conv_dims = [16, 16, 32, 32, 64, 64, 128, 128, 256, 256,
+                              128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16, self.numClasses]
+        else:
+            exit(" [!]Cannot find the defined method {} !".format(self.method))
 
         self.dataPath = dataPath
         self.batchSize = batchSize
