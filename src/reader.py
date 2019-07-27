@@ -9,7 +9,7 @@ import tensorflow as tf
 
 
 class Reader(object):
-    def __init__(self, tfrecordsFile, decodeImgShape=(320, 400, 1), imgShape=(320, 200, 1), batchSize=1, isTrain=True,
+    def __init__(self, tfrecordsFile, decodeImgShape=(320, 400, 1), imgShape=(320, 200, 1), batchSize=1,
                  minQueueExamples=100, numThreads=8, name='DataReader'):
         self.tfrecordsFile = tfrecordsFile
         self.decodeImgShape = decodeImgShape
@@ -17,7 +17,6 @@ class Reader(object):
 
         self.minQueueExamples = minQueueExamples
         self.batchSize = batchSize
-        self.isTrain = isTrain
         self.numThreads = numThreads
         self.reader = tf.TFRecordReader()
         self.name = name
@@ -51,8 +50,7 @@ class Reader(object):
                                                    axis=1)
 
     def shuffle_batch(self):
-        # img_ori, img_trans, img_flip, img_rotate = self.preprocess(image, is_train=self.is_train)
-        img, segImg = self.preprocess(self.imgOri, self.segImgOri, self.isTrain)
+        img, segImg = self.preprocess(self.imgOri, self.segImgOri)
 
         return tf.train.shuffle_batch(tensors=[img, segImg],
                                       batch_size=self.batchSize,
@@ -60,8 +58,11 @@ class Reader(object):
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
-    def batch(self):
-        img, segImg = self.preprocess(self.imgOri, self.segImgOri, self.isTrain)
+    def batch(self, multi_test=False):
+        if multi_test:
+            img, segImg = self.multi_test_process(self.imgOri, self.segImgOri)
+        else:
+            img, segImg = self.imgOri, self.segImgOri
 
         return tf.train.batch(tensors=[img, segImg, self.imageNameBuffer, self.userIdBuffer],
                               batch_size=self.batchSize,
@@ -69,17 +70,22 @@ class Reader(object):
                               capacity=self.minQueueExamples + 3 * self.batchSize,
                               allow_smaller_final_batch=True)
 
+    def multi_test_process(self, imgOri, segImgOri):
+        imgs, segImgs = list(), list()
 
-    def preprocess(self, imgOri, segImgOri, isTrain):
-        if isTrain:
-            # Data augmentation
-            imgTrans, segImgTrans = self.random_translation(imgOri, segImgOri)      # Random translation
-            imgFlip, segImgFlip = self.random_flip(imgTrans, segImgTrans)           # Random left-right flip
-            imgBrit, segImgBrit = self.random_brightness(imgFlip, segImgFlip)       # Random brightness
-            imgRotate, segImgRotate = self.random_rotation(imgBrit, segImgBrit)     # Random rotation
-        else:
-            imgRotate = imgOri
-            segImgRotate = segImgOri
+        for degree in range(-10, 11, 2):
+            img, segImg = self.fixed_rotation(imgOri, segImgOri, degree)
+            imgs.append(img), segImgs.append(segImg)
+
+        return imgs, segImgs
+
+
+    def preprocess(self, imgOri, segImgOri):
+        # Data augmentation
+        imgTrans, segImgTrans = self.random_translation(imgOri, segImgOri)      # Random translation
+        imgFlip, segImgFlip = self.random_flip(imgTrans, segImgTrans)           # Random left-right flip
+        imgBrit, segImgBrit = self.random_brightness(imgFlip, segImgFlip)       # Random brightness
+        imgRotate, segImgRotate = self.random_rotation(imgBrit, segImgBrit)     # Random rotation
 
         return imgRotate, segImgRotate
 
@@ -127,6 +133,21 @@ class Reader(object):
 
         # Step 2: Clip value in the range of v_min and v_max
         img = tf.clip_by_value(t=img, clip_value_min=0., clip_value_max=255.)
+
+        return img, segImg
+
+    def fixed_rotation(self, img, segImg, degree):
+        # Step 1: Concat two images according to the depth axis
+        combined = tf.concat(values=[img, segImg], axis=2)
+
+        # Step 2: from degree to radian
+        radian = degree * math.pi / 180.
+
+        # Step 3: Rotate image
+        combined = tf.contrib.image.rotate(images=combined, angles=radian, interpolation='NEAREST')
+
+        # Step 4: Split into two images
+        img, segImg = tf.split(combined, num_or_size_splits=[self.imgShape[2], self.imgShape[2]], axis=2)
 
         return img, segImg
 
@@ -190,6 +211,15 @@ class Reader(object):
             imgs.append(img), segImgs.append(segImg)
 
         return tf.train.shuffle_batch(tensors=[imgs, segImgs, self.imgOri, self.segImgOri],
+                                      batch_size=self.batchSize,
+                                      num_threads=self.numThreads,
+                                      capacity=self.minQueueExamples + 3 * self.batchSize,
+                                      min_after_dequeue=self.minQueueExamples)
+
+    def test_multi_test(self):
+        imgs, segImgs = self.multi_test_process(self.imgOri, self.segImgOri)
+
+        return tf.train.shuffle_batch(tensors=[imgs, segImgs],
                                       batch_size=self.batchSize,
                                       num_threads=self.numThreads,
                                       capacity=self.minQueueExamples + 3 * self.batchSize,

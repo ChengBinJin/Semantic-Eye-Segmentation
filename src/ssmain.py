@@ -5,23 +5,24 @@
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
 
-import os
 import logging
-import tensorflow as tf
+import os
 from datetime import datetime
+
+import tensorflow as tf
 
 import utils as utils
 from dataset import Dataset
 from model import UNet
 from solver import Solver
 
-
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
-tf.flags.DEFINE_string('method', 'U-Net-light-v2',
+tf.flags.DEFINE_string('method', 'U-Net',
                        'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2], default: U-Net')
-tf.flags.DEFINE_integer('batch_size', 32, 'batch size for one iteration, default: 16')
+tf.flags.DEFINE_bool('multi_test', False, 'multiple rotation feedforwards for test stage, default: False')
+tf.flags.DEFINE_integer('batch_size', 4, 'batch size for one iteration, default: 16')
 tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')
@@ -70,6 +71,7 @@ def main(_):
                      isTrain=FLAGS.is_train,
                      logDir=logDir,
                      method=FLAGS.method,
+                     multi_test=FLAGS.multi_test,
                      name='UNet')
 
     # Initialize solver
@@ -80,20 +82,18 @@ def main(_):
     saver = tf.compat.v1.train.Saver(max_to_keep=1)
 
     if FLAGS.is_train is True:
-        train(solver, saver, logger, modelDir, logDir, sampleDir, valDir)
+        train(solver, saver, logger, modelDir, logDir, sampleDir)
     else:
-        test(solver, saver, modelDir, testDir, data)
+        test(solver, saver, modelDir, valDir, testDir, data)
 
-def train(solver, saver, logger, modelDir, logDir, sampleDir, valDir):
-    best_mIoU, best_acc, best_precision, best_recall = 0., 0., 0., 0.
+def train(solver, saver, logger, modelDir, logDir, sampleDir):
+    best_mIoU, best_acc, best_precision, best_recall, best_f1_score = 0., 0., 0., 0., 0.
     iterTime = 0
 
     if FLAGS.load_model is not None:
-        flag, iterTime, best_mIoU, best_acc, best_precision, best_recall = load_model(saver=saver,
-                                                                                      solver=solver,
-                                                                                      logger=logger,
-                                                                                      model_dir=modelDir,
-                                                                                      is_train=True)
+        flag, iterTime, best_mIoU, best_acc, best_precision, best_recall, best_f1_score = load_model(
+            saver=saver, solver=solver, logger=logger, model_dir=modelDir, is_train=True)
+
         if flag is True:
             logger.info(' [!] Load Sucess! Iter: {}'.format(iterTime))
             logger.info('Best mIoU: {:.3f}'.format(best_mIoU))
@@ -129,12 +129,8 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir, valDir):
 
             # Evaluat models using validation dataset
             if (iterTime % FLAGS.eval_freq) == 0 or (iterTime + 1 == FLAGS.iters):
-                if iterTime + 1 == FLAGS.iters:
-                    mIoU, acc, precision, recall= solver.eval(
-                        tb_writer=tb_writer, iter_time=iterTime, save_dir=valDir, is_test=True)
-                else:
-                    mIoU, acc, precision, recall = solver.eval(
-                        tb_writer=tb_writer, iter_time=iterTime, save_dir=None, is_test=False)
+                mIoU, acc, _, precision, recall, f1_score = solver.eval(
+                    tb_writer=tb_writer, iter_time=iterTime, save_dir=None, is_test=False)
 
                 if best_acc < acc:
                     best_acc = acc
@@ -148,6 +144,10 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir, valDir):
                     best_recall = recall
                     solver.set_best_recall(best_recall)
 
+                if best_f1_score < f1_score:
+                    best_f1_score = f1_score
+                    solver.set_best_f1_score(best_f1_score)
+
                 if best_mIoU < mIoU:
                     best_mIoU = mIoU
                     solver.set_best_mIoU(best_mIoU)
@@ -155,10 +155,11 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir, valDir):
 
                 print("\n")
                 print("*"*70)
-                print('mIoU: {:.3f} \t\t- Best mIoU: {:.3f}'.format(mIoU, best_mIoU))
-                print('Acc.: {:.3f} \t\t- Best Acc.: {:.3f}'.format(acc, best_acc))
-                print("Precision: {:.3f} \t- Best Precision: {:.3f}".format(precision, best_precision))
-                print("Recall: {:.3f} \t\t- Best Recall: {:.3f}".format(recall, best_recall))
+                print('mIoU:      {:.3f} - Best mIoU:      {:.3f}'.format(mIoU, best_mIoU))
+                print('Acc.:      {:.3f} - Best Acc.:      {:.3f}'.format(acc, best_acc))
+                print("Precision: {:.3f} - Best Precision: {:.3f}".format(precision, best_precision))
+                print("Recall:    {:.3f} - Best Recall:    {:.3f}".format(recall, best_recall))
+                print("F1 score:  {:.3f} - Best F1 score:  {:.3f}".format(f1_score, best_f1_score))
                 print("*"*70)
 
             iterTime += 1
@@ -174,13 +175,11 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir, valDir):
         coord.request_stop()
         coord.join(threads)
 
-def test(solver, saver, modelDir, testDir, data):
+def test(solver, saver, modelDir, valDir, testDir, data):
     # Load checkpoint
-    flag, iter_time, best_mIoU, best_acc, best_precision, best_recall = load_model(saver=saver,
-                                                                                   solver=solver,
-                                                                                   logger=None,
-                                                                                   model_dir=modelDir,
-                                                                                   is_train=False)
+    flag, iter_time, best_mIoU, best_acc, best_precision, best_recall, best_f1_score = load_model(
+        saver=saver, solver=solver, logger=None, model_dir=modelDir, is_train=False)
+
     if flag is True:
         print(' [!] Load Success! Iter: {}, Best mIoU: {:.3f}'.format(iter_time, best_mIoU))
     else:
@@ -191,15 +190,21 @@ def test(solver, saver, modelDir, testDir, data):
     threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
 
     try:
-        # mIoU, acc, precision, recall = solver.test_val(save_dir=valDir)
-        #
-        # print("\n")
-        # print("*" * 70)
-        # print('mIoU: {:.3f} \t\t- Best mIoU: {:.3f}'.format(mIoU, best_mIoU))
-        # print('Acc.: {:.3f} \t\t- Best Acc.: {:.3f}'.format(acc, best_acc))
-        # print("Precision: {:.3f} \t- Best Precision: {:.3f}".format(precision, best_precision))
-        # print("Recall: {:.3f} \t\t- Best Recall: {:.3f}".format(recall, best_recall))
-        # print("*" * 70)
+        mIoU, acc, per_cls_acc, precision, recall, f1_score = solver.eval(tb_writer=None,
+                                                                          iter_time=None,
+                                                                          save_dir=valDir,
+                                                                          is_test=True)
+
+        print("\n")
+        print("*" * 70)
+        print('mIoU:      {:.3f} - Best mIoU:      {:.3f}'.format(mIoU, best_mIoU))
+        print('Acc.:      {:.3f} - Best Acc.:      {:.3f}'.format(acc, best_acc))
+        print("Precision: {:.3f} - Best Precision: {:.3f}".format(precision, best_precision))
+        print("Recall:    {:.3f} - Best Recall:    {:.3f}".format(recall, best_recall))
+        print("F1 Score:  {:.3f} - Best F1 Score:  {:.3f}".format(f1_score, best_f1_score))
+        for i in range(len(per_cls_acc)):
+            print('Per Class {} Acc.: {:.3f}%'.format(i, per_cls_acc[i]))
+        print("*" * 70)
 
         solver.test_test(save_dir=testDir)
 
@@ -230,6 +235,7 @@ def load_model(saver, solver, logger, model_dir, is_train=False):
         ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
         saver.restore(solver.sess, os.path.join(model_dir, ckpt_name))
 
+
         meta_graph_path = ckpt.model_checkpoint_path + '.meta'
         iter_time = int(meta_graph_path.split('-')[-1].split('.')[0])
 
@@ -244,9 +250,15 @@ def load_model(saver, solver, logger, model_dir, is_train=False):
         best_precision = solver.get_best_precision()
         best_recall = solver.get_best_recall()
 
-        return True, iter_time + 1, best_mIoU, best_acc, best_precision, best_recall
+        # New added measurements
+        try:
+            best_f1_score = solver.get_best_f1_score()
+        except:
+            best_f1_score = 0.
+
+        return True, iter_time + 1, best_mIoU, best_acc, best_precision, best_recall, best_f1_score
     else:
-        return False, None, None, None, None, None
+        return False, None, None, None, None, None, None
 
 
 if __name__ == '__main__':

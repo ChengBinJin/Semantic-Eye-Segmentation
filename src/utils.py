@@ -72,8 +72,7 @@ def make_folders(isTrain=True, curTime=None, subfolder=None):
     modelDir = os.path.join('model', subfolder, '{}'.format(curTime))
     logDir = os.path.join('log', subfolder, '{}'.format(curTime))
     sampleDir = os.path.join('sample', subfolder, '{}'.format(curTime))
-    valDir = os.path.join('val', subfolder, '{}'.format(curTime))
-    testDir = None
+    valDir, testDir = None, None
 
     if isTrain:
         if not os.path.isdir(modelDir):
@@ -85,10 +84,13 @@ def make_folders(isTrain=True, curTime=None, subfolder=None):
         if not os.path.isdir(sampleDir):
             os.makedirs(sampleDir)
 
+
+    else:
+        valDir = os.path.join('val', subfolder, '{}'.format(curTime))
+        testDir = os.path.join('test', subfolder, '{}'.format(curTime))
+
         if not os.path.isdir(valDir):
             os.makedirs(valDir)
-    else:
-        testDir = os.path.join('test', subfolder, '{}'.format(curTime))
 
         if not os.path.isdir(testDir):
             os.makedirs(testDir)
@@ -125,6 +127,7 @@ def print_main_parameters(logger, flags, isTrain=False):
         logger.info('gpu_index: \t\t\t{}'.format(flags.gpu_index))
         logger.info('dataset: \t\t\t{}'.format(flags.dataset))
         logger.info('method: \t\t\t{}'.format(flags.method))
+        logger.info('multi_test: \t\t{}'.format(flags.multi_test))
         logger.info('batch_size: \t\t\t{}'.format(flags.batch_size))
         logger.info('resize_factor: \t\t{}'.format(flags.resize_factor))
         logger.info('is_train: \t\t\t{}'.format(flags.is_train))
@@ -139,6 +142,7 @@ def print_main_parameters(logger, flags, isTrain=False):
         print('-- gpu_index: \t\t{}'.format(flags.gpu_index))
         print('-- dataset: \t\t{}'.format(flags.dataset))
         print('-- method: \t\t{}'.format(flags.method))
+        print('-- multi_test: \t\t{}'.format(flags.multi_test))
         print('-- batch_size: \t\t{}'.format(flags.batch_size))
         print('-- resize_factor: \t\t{}'.format(flags.resize_factor))
         print('-- is_train: \t\t{}'.format(flags.is_train))

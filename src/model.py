@@ -15,12 +15,13 @@ from reader import Reader
 class UNet(object):
     def __init__(self, decodeImgShape=(320, 400, 1), outputShape=(320, 200, 1), numClasses=4,
                  dataPath=(None, None), batchSize=1, lr=1e-3, weightDecay=1e-4, totalIters=2e5, isTrain=True,
-                 logDir=None, method=None, name='UNet'):
+                 logDir=None, method=None, multi_test=True, name='UNet'):
         self.decodeImgShape = decodeImgShape
         self.inputShape = outputShape
         self.outputShape = outputShape
         self.numClasses = numClasses
         self.method = method
+        self.multi_test = multi_test
 
         if self.method == 'U-Net':
             self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
@@ -28,7 +29,7 @@ class UNet(object):
         elif self.method == 'U-Net-light-v1':
             self.conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
                               256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32, self.numClasses]
-        elif self.method == 'U-Net-light-v2':  # U-Net-light-v2
+        elif self.method == 'U-Net-light-v2':
             self.conv_dims = [16, 16, 32, 32, 64, 64, 128, 128, 256, 256,
                               128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16, self.numClasses]
         else:
@@ -69,7 +70,6 @@ class UNet(object):
                              decodeImgShape=self.decodeImgShape,
                              imgShape=self.inputShape,
                              batchSize=self.batchSize,
-                             isTrain=True,
                              name='train')
 
         # Random batch for training
@@ -100,11 +100,10 @@ class UNet(object):
                            decodeImgShape=self.decodeImgShape,
                            imgShape=self.inputShape,
                            batchSize=1,
-                           isTrain=False,
                            name='validation')
 
         # Batch for validation data
-        imgVal, segImgVal, self.img_name_val, self.user_id_val = valReader.batch()
+        imgVal, segImgVal, self.img_name_val, self.user_id_val = valReader.batch(multi_test=self.multi_test)
 
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
@@ -137,6 +136,16 @@ class UNet(object):
                 labels=tf.squeeze(self.segImgVal, axis=-1),
                 predictions=self.predClsVal)
 
+            # Calculate F1 score
+            self.f1_score_metric = tf.math.divide(2 * self.precision_metric * self.recall_metric ,
+                                            (self.precision_metric + self.recall_metric))
+
+            # Calculate per-class accuracy
+            _, self.per_class_accuracy_metric_update = tf.compat.v1.metrics.mean_per_class_accuracy(
+                    labels=tf.squeeze(self.segImgVal, axis=-1),
+                    predictions=self.predClsVal,
+                    num_classes=self.numClasses)
+
         # Isolate the variables stored behind the scens by the metric operation
         running_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.LOCAL_VARIABLES, scope='Metrics')
 
@@ -149,11 +158,10 @@ class UNet(object):
                             decodeImgShape=self.decodeImgShape,
                             imgShape=self.inputShape,
                             batchSize=1,
-                            isTrain=False,
                             name='test')
 
         # Batch for validation data
-        self.imgTest, _, self.img_name_test, self.user_id_test = testReader.batch()
+        self.imgTest, _, self.img_name_test, self.user_id_test = testReader.batch(multi_test=self.multi_test)
 
         # Network forward for validation data
         self.predTest = self.forward_network(inputImg=self.normalize(self.imgTest), reuse=True)
@@ -164,6 +172,7 @@ class UNet(object):
         self.best_acc_ph = tf.compat.v1.placeholder(tf.float32, name='best_acc')
         self.best_precision_ph = tf.compat.v1.placeholder(tf.float32, name='best_precision')
         self.best_recall_ph = tf.compat.v1.placeholder(tf.float32, name='best_recall')
+        self.best_f1_score_ph = tf.compat.v1.placeholder(tf.float32, name='best_f1_score')
 
         # Best mIoU variable
         self.best_mIoU = tf.compat.v1.get_variable(name='best_mIoU', dtype=tf.float32, initializer=tf.constant(0.),
@@ -184,6 +193,13 @@ class UNet(object):
         self.best_recall = tf.compat.v1.get_variable(name='best_recall', dtype=tf.float32, initializer=tf.constant(0.),
                                                      trainable=False)
         self.assign_best_recall = tf.assign(self.best_recall, value=self.best_recall_ph)
+
+        ################################################################################################################
+        # # Best f1_score variable
+        # self.best_f1_score = tf.compat.v1.get_variable(name='best_f1_score', dtype=tf.float32, initializer=tf.constant(0.),
+        #                                                trainable=False)
+        # self.assign_best_f1_score = tf.assign(self.best_f1_score, value=self.best_f1_score_ph)
+        ################################################################################################################
 
     def init_optimizer(self, loss, name=None):
         with tf.compat.v1.variable_scope(name):
@@ -215,8 +231,16 @@ class UNet(object):
         self.tb_accuracy = tf.summary.scalar('Acc/accuracy', self.accuracy_metric)
         self.tb_precision = tf.summary.scalar('Acc/precision', self.precision_metric)
         self.tb_recall = tf.summary.scalar('Acc/recall', self.recall_metric)
+
+        ################################################################################################################
+        # self.tb_f1_score = tf.summary.scalar('Acc/f1_score', self.f1_score_metric)
+        # self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
+        #                                                   self.tb_precision, self.tb_recall, self.tb_f1_score])
+
         self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
                                                           self.tb_precision, self.tb_recall])
+
+        ################################################################################################################
 
     @staticmethod
     def normalize(data):

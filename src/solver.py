@@ -42,6 +42,7 @@ class Solver(object):
                    self.model.accuracy_metric_update,
                    self.model.precision_metric_update,
                    self.model.recall_metric_update,
+                   self.model.per_class_accuracy_metric_update,
                    self.model.imgVal,
                    self.model.predClsVal,
                    self.model.segImgVal,
@@ -55,9 +56,11 @@ class Solver(object):
         # Initialize/reset the running variables
         self.sess.run(self.model.running_vars_initializer)
 
+        per_cla_acc_mat = None
         for iterTime in range(self.data.numValImgs):
             # Update the running variables on new batch of samples
-            _, _, _, _, img, predCls, segImg, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+            _, _, _, _, per_cla_acc_mat, img, predCls, segImg, img_name, user_id = self.sess.run(
+                run_ops, feed_dict=feed)
 
             if iterTime % 100 == 0:
                 msg  = "\r - Evaluating progress: {:.2f}%".format((iterTime/self.data.numValImgs)*100.)
@@ -74,22 +77,27 @@ class Solver(object):
                                     is_vertical=False)
 
         # Calculate the mIoU
-        mIoU, accuracy, precision, recall, metric_summary_op = self.sess.run([self.model.mIoU_metric,
-                                                                              self.model.accuracy_metric,
-                                                                              self.model.precision_metric,
-                                                                              self.model.recall_metric,
-                                                                              self.model.metric_summary_op])
+        mIoU, accuracy, precision, recall, f1_score,  metric_summary_op = self.sess.run([
+            self.model.mIoU_metric,
+            self.model.accuracy_metric,
+            self.model.precision_metric,
+            self.model.recall_metric,
+            self.model.f1_score_metric,
+            self.model.metric_summary_op])
 
-        # Write to tensorboard
-        tb_writer.add_summary(metric_summary_op, iter_time)
-        tb_writer.flush()
+        if not is_test:
+            # Write to tensorboard
+            tb_writer.add_summary(metric_summary_op, iter_time)
+            tb_writer.flush()
 
         mIoU *= 100.
         accuracy *= 100.
         precision *= 100.
         recall *= 100.
+        f1_score *= 100.
+        per_cla_acc_mat *= 100.
 
-        return mIoU, accuracy, precision, recall
+        return mIoU, accuracy, per_cla_acc_mat, precision, recall, f1_score
     
     def test_test(self, save_dir):
         print('Number of iterations: {}'.format(self.data.numTestImgs))
@@ -156,3 +164,9 @@ class Solver(object):
 
     def get_best_recall(self):
         return self.sess.run(self.model.best_recall)
+
+    def set_best_f1_score(self, best_f1_score):
+        self.sess.run(self.model.assign_best_f1_score, feed_dict={self.model.best_f1_score_ph: best_f1_score})
+
+    def get_best_f1_score(self):
+        return self.sess.run(self.model.best_f1_score)
