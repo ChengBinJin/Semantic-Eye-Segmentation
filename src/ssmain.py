@@ -19,10 +19,11 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
-tf.flags.DEFINE_string('method', 'U-Net-light-v2',
-                       'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2], default: U-Net-light-v1')
+tf.flags.DEFINE_string('method', 'U-Net-light-v3',
+                       'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3], '
+                       'default: U-Net-light-v3')
 tf.flags.DEFINE_bool('multi_test', False, 'multiple rotation feedforwards for test stage, default: False')
-tf.flags.DEFINE_integer('batch_size', 32, 'batch size for one iteration, default: 32')
+tf.flags.DEFINE_integer('batch_size',128, 'batch size for one iteration, default: 128')
 tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')

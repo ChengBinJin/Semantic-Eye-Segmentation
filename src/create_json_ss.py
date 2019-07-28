@@ -61,8 +61,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Script to create submission JSON file for OpenEDS competition held on EvalAI platform.")
     parser.add_argument("--method", type=str, dest="method",
-                        help="Select a method from [U-Net, U-Net-light-v1, U-Net-light-v2]",
-                        default="U-Net-light-v1")
+                        help="Select a method from [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3]",
+                        default="U-Net-light-v3")
     parser.add_argument("--list-file", type=str, dest="list_file",
                         help="Path to text file containing list of FULL FILEPATH of labels saved in .npy format", 
                         default=None)
