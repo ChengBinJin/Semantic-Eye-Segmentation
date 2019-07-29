@@ -128,7 +128,7 @@ class Solver(object):
             if iterTime % 100 == 0:
                 print("- Evaluating progress: {:.2f}%".format((iterTime/self.data.numTestImgs)*100.))
 
-    def sample(self, iterTime, saveDir):
+    def sample(self, iterTime, saveDir, num_imgs=8):
         feed = {
             self.model.ratePh: 0.5  # rate: 1 - keep_prob
         }
@@ -136,7 +136,11 @@ class Solver(object):
         img, predCls, segImg = self.sess.run([self.model.imgTrain, self.model.predClsTrain, self.model.segImgTrain],
                                              feed_dict=feed)
 
-        utils.save_imgs(img_stores=[img, predCls, segImg],
+        # if batch_size is bigger than num_imgs, we just show num_imgs
+        num_imgs = np.minimum(num_imgs, img.shape[0])
+
+        # Save imgs
+        utils.save_imgs(img_stores=[img[:num_imgs], predCls[:num_imgs], segImg[:num_imgs]],
                         iterTime=iterTime,
                         saveDir=saveDir,
                         is_vertical=True)
