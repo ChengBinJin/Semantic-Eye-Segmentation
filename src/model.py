@@ -5,6 +5,8 @@
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
 import logging
+import math
+import numpy as np
 import tensorflow as tf
 
 import utils as utils
@@ -21,7 +23,10 @@ class UNet(object):
         self.outputShape = outputShape
         self.numClasses = numClasses
         self.method = method
+
         self.multi_test = multi_test
+        self.degree = 10
+        self.num_try = len(range(-self.degree, self.degree+1, 2))  # multi_tes: from -10 degree to 11 degrees
 
         if self.method == 'U-Net':
             self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
@@ -34,6 +39,9 @@ class UNet(object):
                               128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16, self.numClasses]
         elif self.method == 'U-Net-light-v3':
             self.conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 128, 128,
+                              64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8, self.numClasses]
+        elif self.method == 'U-Net-light-v4':
+            self.conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 64, 64,
                               64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8, self.numClasses]
         else:
             exit(" [!]Cannot find the defined method {} !".format(self.method))
@@ -106,16 +114,46 @@ class UNet(object):
                            name='validation')
 
         # Batch for validation data
-        imgVal, segImgVal, self.img_name_val, self.user_id_val = valReader.batch(multi_test=self.multi_test)
+        imgVal, segImgVal, self.img_name_val, self.user_id_val = valReader.batch(
+            multi_test= False if self.isTrain else self.multi_test)
 
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
-        self.imgVal = tf.reshape(imgVal, shape=[1, *self.outputShape])
-        self.segImgVal = tf.reshape(segImgVal, shape=[1, *self.outputShape])
+        if self.multi_test:
+            shape = [self.num_try, *self.outputShape]
+        else:
+            shape = [1, *self.outputShape]
+
+        # Roateds img and segImg are step 1
+        imgVal = tf.reshape(imgVal, shape=shape)
+        segImgVal = tf.reshape(segImgVal, shape=shape)
 
         # Network forward for validation data
-        self.predVal = self.forward_network(inputImg=self.normalize(self.imgVal), reuse=True)
-        self.predClsVal = tf.math.argmax(self.predVal, axis=-1)
+        predVal = self.forward_network(inputImg=self.normalize(imgVal), reuse=True)
+
+        # Since multi_test, we need inversely rotate back to the original segImg
+        if self.multi_test:
+            # Step 1: original rotated images
+            self.imgVal_s1, self.predVal_s1, self.segImgVal_s1 = imgVal, predVal, segImgVal
+
+            # Step 2: inverse-rotated images
+            self.imgVal_s2, self.predVal_s2, self.segImgVal_s2 = self.roate_independently(
+                imgVal, predVal, segImgVal)
+
+            # Step 3: combine all results to estimate the final result
+            sum_all = tf.math.reduce_sum(self.predVal_s2, axis=0)   # [N, H, W, num_actions] -> [H, W, num_actions]
+            sum_all = tf.expand_dims(sum_all, axis=0)               # [H, W, num_actions] -> [1, H, W, num_actions]
+            predVal_s3 = tf.math.argmax(sum_all, axis=-1)           # [1, H, W]
+
+            _, h, w, c = imgVal.get_shape().as_list()
+            base_id = int(np.floor(self.num_try / 2.))
+            self.imgVal = tf.slice(imgVal, begin=[base_id, 0, 0, 0], size=[1, h, w, c])
+            self.segImgVal = tf.slice(segImgVal, begin=[base_id, 0, 0, 0], size=[1, h, w, c])
+            self.predClsVal = predVal_s3
+        else:
+            self.imgVal = imgVal
+            self.segImgVal = segImgVal
+            self.predClsVal = tf.math.argmax(predVal, axis=-1)
 
         with tf.compat.v1.name_scope('Metrics'):
             # Calculate mean IoU using TensorFlow
@@ -145,7 +183,7 @@ class UNet(object):
 
             # Calculate per-class accuracy
             _, self.per_class_accuracy_metric_update = tf.compat.v1.metrics.mean_per_class_accuracy(
-                    labels=tf.squeeze(self.segImgVal, axis=-1),
+                    labels=tf.squeeze(self.segImgVal),
                     predictions=self.predClsVal,
                     num_classes=self.numClasses)
 
@@ -154,6 +192,31 @@ class UNet(object):
 
         # Define initializer to initialie/reset running variables
         self.running_vars_initializer = tf.compat.v1.variables_initializer(var_list=running_vars)
+
+    def roate_independently(self, imgVal, predVal, segImgVal):
+        imgs, preds, segImgs = list(), list(), list()
+
+        for idx, degree in enumerate(range(self.degree, -self.degree - 1, -2)):
+            n, h, w, c = imgVal.get_shape().as_list()
+
+            # Extract spectific tensor
+            img = tf.slice(imgVal, begin=[idx, 0, 0, 0], size=[1, h, w, c])                     # [1, H, W, 1]
+            pred = tf.slice(predVal, begin=[idx, 0, 0, 0], size=[1, h, w, self.numClasses])     # [1, H, W, num_classes]
+            segImg = tf.slice(segImgVal, begin=[idx, 0, 0, 0], size=[1, h, w, c])               # [1, H, W, 1]
+
+            # From degree to radian
+            radian = degree * math.pi / 180.
+
+            # Roate img and segImgs
+            imgs.append(tf.contrib.image.rotate(images=img, angles=radian, interpolation='BILINEAR'))
+            preds.append(tf.contrib.image.rotate(images=pred, angles=radian, interpolation='BILINEAR'))
+            segImgs.append(tf.contrib.image.rotate(images=segImg, angles=radian, interpolation='NEAREST'))
+
+        output_imgs = tf.concat(imgs, axis=0)
+        output_preds = tf.concat(preds, axis=0)
+        output_segImgs = tf.concat(segImgs, axis=0)
+
+        return output_imgs, output_preds, output_segImgs
 
     def _init_test_graph(self):
         # Initialize TFRecoder reader
@@ -164,7 +227,14 @@ class UNet(object):
                             name='test')
 
         # Batch for validation data
-        self.imgTest, _, self.img_name_test, self.user_id_test = testReader.batch(multi_test=self.multi_test)
+        imgTest, _, self.img_name_test, self.user_id_test = testReader.batch(multi_test=self.multi_test)
+
+        # Convert the shape [?, self.num_try, H, W, 1] to [self.num_try, H, W, 1] for multi-test
+        if self.multi_test:
+            shape = [self.num_try, *self.outputShape]
+        else:
+            shape = [1, *self.outputShape]
+        self.imgTest = tf.reshape(imgTest, shape=shape)
 
         # Network forward for validation data
         self.predTest = self.forward_network(inputImg=self.normalize(self.imgTest), reuse=True)

@@ -4,6 +4,7 @@
 # Written by Cheng-Bin Jin
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
+import os
 import sys
 import numpy as np
 import tensorflow as tf
@@ -11,9 +12,10 @@ import utils as utils
 
 
 class Solver(object):
-    def __init__(self, model, data):
+    def __init__(self, model, data, multi_test=False):
         self.model = model
         self.data = data
+        self.multi_test = multi_test
 
         self._init_session()
         self._init_variables()
@@ -37,17 +39,36 @@ class Solver(object):
 
         return self.sess.run([trainOp, totalLoss, dataLoss, regTerm, summary_op], feed_dict=feed)
 
-    def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_test=False):
-        run_ops = [self.model.mIoU_metric_update,
-                   self.model.accuracy_metric_update,
-                   self.model.precision_metric_update,
-                   self.model.recall_metric_update,
-                   self.model.per_class_accuracy_metric_update,
-                   self.model.imgVal,
-                   self.model.predClsVal,
-                   self.model.segImgVal,
-                   self.model.img_name_val,
-                   self.model.user_id_val]
+    def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_test=False, is_debug=True):
+        if self.multi_test:
+            run_ops = [self.model.mIoU_metric_update,
+                       self.model.accuracy_metric_update,
+                       self.model.precision_metric_update,
+                       self.model.recall_metric_update,
+                       self.model.per_class_accuracy_metric_update,
+                       self.model.imgVal,
+                       self.model.predClsVal,
+                       self.model.segImgVal,
+                       self.model.img_name_val,
+                       self.model.user_id_val,
+                       self.model.imgVal_s1,
+                       self.model.imgVal_s2,
+                       self.model.predVal_s1,
+                       self.model.predVal_s2,
+                       self.model.segImgVal_s1,
+                       self.model.segImgVal_s2]
+        else:
+            run_ops = [self.model.mIoU_metric_update,
+                       self.model.accuracy_metric_update,
+                       self.model.precision_metric_update,
+                       self.model.recall_metric_update,
+                       self.model.per_class_accuracy_metric_update,
+                       self.model.imgVal,
+                       self.model.predClsVal,
+                       self.model.segImgVal,
+                       self.model.img_name_val,
+                       self.model.user_id_val]
+
 
         feed = {
             self.model.ratePh: 0.  # rate: 1 - keep_prob
@@ -58,9 +79,14 @@ class Solver(object):
 
         per_cla_acc_mat = None
         for iterTime in range(self.data.numValImgs):
-            # Update the running variables on new batch of samples
-            _, _, _, _, per_cla_acc_mat, img, predCls, segImg, img_name, user_id = self.sess.run(
-                run_ops, feed_dict=feed)
+            img_s1, img_s2, pred_s1, pred_s2, segImg_s1, segImg_s2 = None, None, None, None, None, None
+
+            if self.multi_test:
+                _, _, _, _, per_cla_acc_mat, img, predCls, segImg, img_name, user_id, \
+                img_s1, img_s2, pred_s1, pred_s2, segImg_s1, segImg_s2 = self.sess.run(run_ops, feed_dict=feed)
+            else:
+                _, _, _, _, per_cla_acc_mat, img, predCls, segImg, img_name, user_id = \
+                    self.sess.run(run_ops, feed_dict=feed)
 
             if iterTime % 100 == 0:
                 msg  = "\r - Evaluating progress: {:.2f}%".format((iterTime/self.data.numValImgs)*100.)
@@ -69,12 +95,39 @@ class Solver(object):
                 sys.stdout.write(msg)
                 sys.stdout.flush()
 
+            ############################################################################################################
             if is_test:
                 # Save images
                 utils.save_imgs(img_stores=[img, predCls, segImg],
-                                    saveDir=save_dir,
-                                    img_name=img_name.astype('U26'),
-                                    is_vertical=False)
+                                saveDir=save_dir,
+                                img_name=img_name.astype('U26'),
+                                is_vertical=False)
+
+            if is_test and is_debug and self.multi_test:
+                # # Step 1: save rotated images
+                predCls_s1 = np.argmax(pred_s1, axis=-1)  # predict class using argmax function
+                utils.save_imgs(img_stores=[img_s1, predCls_s1, segImg_s1],
+                                saveDir=os.path.join(save_dir, 'debug'),
+                                name_append='step1_',
+                                img_name=img_name.astype('U26'),
+                                is_vertical=True)
+
+                # Step 2: save inverse-roated images
+                predCls_s2 = np.argmax(pred_s2, axis=-1)  # predict class using argmax function
+                utils.save_imgs(img_stores=[img_s2, predCls_s2, segImg_s2],
+                                saveDir=os.path.join(save_dir, 'debug'),
+                                name_append='step2_',
+                                img_name=img_name.astype('U26'),
+                                is_vertical=True)
+
+                # Step 3: Save comparison image that includes img, single_pred, multi-test_pred, gt
+                utils.save_imgs(img_stores=[img, np.expand_dims(predCls_s1[5], axis=0), predCls, segImg],
+                                saveDir=os.path.join(save_dir, 'debug'),
+                                name_append='step3_',
+                                img_name=img_name.astype('U26'),
+                                is_vertical=False)
+
+            ############################################################################################################
 
         # Calculate the mIoU
         mIoU, accuracy, precision, recall, f1_score,  metric_summary_op = self.sess.run([
@@ -98,6 +151,8 @@ class Solver(object):
         per_cla_acc_mat *= 100.
 
         return mIoU, accuracy, per_cla_acc_mat, precision, recall, f1_score
+
+    # def process_multi_results(self, img_stores):
     
     def test_test(self, save_dir):
         print('Number of iterations: {}'.format(self.data.numTestImgs))

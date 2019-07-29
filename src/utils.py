@@ -220,7 +220,10 @@ def save_npy(data, save_dir, file_name):
     np.save(os.path.join(save_dir, file_name), data)
 
 
-def save_imgs(img_stores, iterTime=None, saveDir=None, margin=5, img_name=None, is_vertical=True):
+def save_imgs(img_stores, iterTime=None, saveDir=None, margin=5, img_name=None, name_append='', is_vertical=True):
+    if not os.path.isdir(saveDir):
+        os.makedirs(saveDir)
+
     num_categories = len(img_stores)
     for i in range(num_categories):
         if img_stores[i].shape[-1] == 1:
@@ -259,4 +262,4 @@ def save_imgs(img_stores, iterTime=None, saveDir=None, margin=5, img_name=None, 
     if img_name is None:
         cv2.imwrite(os.path.join(saveDir, str(iterTime).zfill(6) + '.png'), canvas)
     else:
-        cv2.imwrite(os.path.join(saveDir, img_name[0]), canvas)
+        cv2.imwrite(os.path.join(saveDir, name_append+img_name[0]), canvas)

@@ -19,8 +19,8 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
-tf.flags.DEFINE_string('method', 'U-Net-light-v3',
-                       'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3], '
+tf.flags.DEFINE_string('method', 'U-Net-light-v2',
+                       'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3, U-Net-light-v4], '
                        'default: U-Net-light-v3')
 tf.flags.DEFINE_bool('multi_test', False, 'multiple rotation feedforwards for test stage, default: False')
 tf.flags.DEFINE_integer('batch_size', 16, 'batch size for one iteration, default: 128')
@@ -77,7 +77,8 @@ def main(_):
 
     # Initialize solver
     solver = Solver(model=model,
-                    data=data)
+                    data=data,
+                    multi_test=FLAGS.multi_test)
 
     # Initialize saver
     saver = tf.compat.v1.train.Saver(max_to_keep=1)
@@ -207,7 +208,10 @@ def test(solver, saver, modelDir, valDir, testDir, data):
             print('Per Class {} Acc.: {:.3f}%'.format(i, per_cls_acc[i]))
         print("*" * 70)
 
-        solver.test_test(save_dir=testDir)
+        ################################################################################################################
+        # solver.test_test(save_dir=testDir)
+
+        ################################################################################################################
 
     except KeyboardInterrupt:
         coord.request_stop()
