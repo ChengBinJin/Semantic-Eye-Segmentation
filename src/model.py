@@ -23,8 +23,9 @@ class UNet(object):
         self.outputShape = outputShape
         self.numClasses = numClasses
         self.method = method
+        self.isTrain = isTrain
 
-        self.multi_test = multi_test
+        self.multi_test = False if self.isTrain else multi_test
         self.degree = 10
         self.num_try = len(range(-self.degree, self.degree+1, 2))  # multi_tes: from -10 degree to 11 degrees
 
@@ -53,7 +54,6 @@ class UNet(object):
         self.totalSteps = totalIters
         self.startDecayStep = int(self.totalSteps * 0.5)
         self.decaySteps = self.totalSteps - self.startDecayStep
-        self.isTrain = isTrain
         self.logDir = logDir
         self.name=name
 
@@ -193,8 +193,11 @@ class UNet(object):
         # Define initializer to initialie/reset running variables
         self.running_vars_initializer = tf.compat.v1.variables_initializer(var_list=running_vars)
 
-    def roate_independently(self, imgVal, predVal, segImgVal):
-        imgs, preds, segImgs = list(), list(), list()
+    def roate_independently(self, imgVal, predVal, segImgVal=None, is_test=False):
+        imgs, preds = list(), list()
+        segImgs, segImg = None, None
+        if not is_test:
+            segImgs = list()
 
         for idx, degree in enumerate(range(self.degree, -self.degree - 1, -2)):
             n, h, w, c = imgVal.get_shape().as_list()
@@ -202,7 +205,8 @@ class UNet(object):
             # Extract spectific tensor
             img = tf.slice(imgVal, begin=[idx, 0, 0, 0], size=[1, h, w, c])                     # [1, H, W, 1]
             pred = tf.slice(predVal, begin=[idx, 0, 0, 0], size=[1, h, w, self.numClasses])     # [1, H, W, num_classes]
-            segImg = tf.slice(segImgVal, begin=[idx, 0, 0, 0], size=[1, h, w, c])               # [1, H, W, 1]
+            if not is_test:
+                segImg = tf.slice(segImgVal, begin=[idx, 0, 0, 0], size=[1, h, w, c])           # [1, H, W, 1]
 
             # From degree to radian
             radian = degree * math.pi / 180.
@@ -210,13 +214,13 @@ class UNet(object):
             # Roate img and segImgs
             imgs.append(tf.contrib.image.rotate(images=img, angles=radian, interpolation='BILINEAR'))
             preds.append(tf.contrib.image.rotate(images=pred, angles=radian, interpolation='BILINEAR'))
-            segImgs.append(tf.contrib.image.rotate(images=segImg, angles=radian, interpolation='NEAREST'))
+            if not is_test:
+                segImgs.append(tf.contrib.image.rotate(images=segImg, angles=radian, interpolation='NEAREST'))
 
-        output_imgs = tf.concat(imgs, axis=0)
-        output_preds = tf.concat(preds, axis=0)
-        output_segImgs = tf.concat(segImgs, axis=0)
-
-        return output_imgs, output_preds, output_segImgs
+        if not is_test:
+            return tf.concat(imgs, axis=0), tf.concat(preds, axis=0), tf.concat(segImgs, axis=0)
+        else:
+            return tf.concat(imgs, axis=0), tf.concat(preds, axis=0)
 
     def _init_test_graph(self):
         # Initialize TFRecoder reader
@@ -226,7 +230,7 @@ class UNet(object):
                             batchSize=1,
                             name='test')
 
-        # Batch for validation data
+        # Batch for test data
         imgTest, _, self.img_name_test, self.user_id_test = testReader.batch(multi_test=self.multi_test)
 
         # Convert the shape [?, self.num_try, H, W, 1] to [self.num_try, H, W, 1] for multi-test
@@ -234,11 +238,31 @@ class UNet(object):
             shape = [self.num_try, *self.outputShape]
         else:
             shape = [1, *self.outputShape]
-        self.imgTest = tf.reshape(imgTest, shape=shape)
+        imgTest = tf.reshape(imgTest, shape=shape)
 
-        # Network forward for validation data
-        self.predTest = self.forward_network(inputImg=self.normalize(self.imgTest), reuse=True)
-        self.predClsTest = tf.math.argmax(self.predTest, axis=-1)
+        # Network forward for test data
+        predTest = self.forward_network(inputImg=self.normalize(imgTest), reuse=True)
+
+        # Since multi_test, we need inversely rotate back to the original segImg
+        if self.multi_test:
+            # Step 1: original rotated images
+            self.imgTest_s1, self.predTest_s1 = imgTest, predTest
+
+            # Step 2: inverse-rotated images
+            self.imgTest_s2, self.predTest_s2= self.roate_independently(self.imgTest_s1, self.predTest_s1, is_test=True)
+
+            # Step 3: combine all results to estimate the final result
+            sum_all = tf.math.reduce_sum(self.predTest_s2, axis=0)   # [N, H, W, num_actions] -> [H, W, num_actions]
+            sum_all = tf.expand_dims(sum_all, axis=0)                # [H, W, num_actions] -> [1, H, W, num_actions]
+            predTest_s3 = tf.math.argmax(sum_all, axis=-1)           # [1, H, W]
+
+            _, h, w, c = imgTest.get_shape().as_list()
+            base_id = int(np.floor(self.num_try / 2.))
+            self.imgTest = tf.slice(imgTest, begin=[base_id, 0, 0, 0], size=[1, h, w, c])
+            self.predClsTest = predTest_s3
+        else:
+            self.imgTest = imgTest
+            self.predClsTest = tf.math.argmax(predTest, axis=-1)
 
     def _best_metrics_record(self):
         self.best_mIoU_ph = tf.compat.v1.placeholder(tf.float32, name='best_mIoU')

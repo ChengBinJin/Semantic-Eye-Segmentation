@@ -12,10 +12,11 @@ import utils as utils
 
 
 class Solver(object):
-    def __init__(self, model, data, multi_test=False):
+    def __init__(self, model, data, is_train=False, multi_test=False):
         self.model = model
         self.data = data
-        self.multi_test = multi_test
+        self.is_train = is_train
+        self.multi_test = False if self.is_train else multi_test
 
         self._init_session()
         self._init_variables()
@@ -39,7 +40,7 @@ class Solver(object):
 
         return self.sess.run([trainOp, totalLoss, dataLoss, regTerm, summary_op], feed_dict=feed)
 
-    def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_test=False, is_debug=True):
+    def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_debug=False):
         if self.multi_test:
             run_ops = [self.model.mIoU_metric_update,
                        self.model.accuracy_metric_update,
@@ -96,14 +97,14 @@ class Solver(object):
                 sys.stdout.flush()
 
             ############################################################################################################
-            if is_test:
+            if not self.is_train:
                 # Save images
                 utils.save_imgs(img_stores=[img, predCls, segImg],
                                 saveDir=save_dir,
                                 img_name=img_name.astype('U26'),
                                 is_vertical=False)
 
-            if is_test and is_debug and self.multi_test:
+            if not self.is_train and is_debug and self.multi_test:
                 # # Step 1: save rotated images
                 predCls_s1 = np.argmax(pred_s1, axis=-1)  # predict class using argmax function
                 utils.save_imgs(img_stores=[img_s1, predCls_s1, segImg_s1],
@@ -138,7 +139,7 @@ class Solver(object):
             self.model.f1_score_metric,
             self.model.metric_summary_op])
 
-        if not is_test:
+        if self.is_train:
             # Write to tensorboard
             tb_writer.add_summary(metric_summary_op, iter_time)
             tb_writer.flush()
@@ -151,23 +152,42 @@ class Solver(object):
         per_cla_acc_mat *= 100.
 
         return mIoU, accuracy, per_cla_acc_mat, precision, recall, f1_score
-
-    # def process_multi_results(self, img_stores):
     
-    def test_test(self, save_dir):
+    def test_test(self, save_dir, is_debug=True):
         print('Number of iterations: {}'.format(self.data.numTestImgs))
 
-        run_ops = [self.model.imgTest,
-                   self.model.predClsTest,
-                   self.model.img_name_test,
-                   self.model.user_id_test]
+        if self.multi_test:
+            run_ops = [self.model.imgTest,
+                       self.model.predTest_s1,
+                       self.model.predClsTest,
+                       self.model.img_name_test,
+                       self.model.user_id_test]
+        else:
+            run_ops = [self.model.imgTest,
+                       self.model.predClsTest,
+                       self.model.img_name_test,
+                       self.model.user_id_test]
 
         feed = {
             self.model.ratePh: 0.  # rate: 1 - keep_prob
         }
 
+        pred_s1 = None
         for iterTime in range(self.data.numTestImgs):
-            img, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+            if self.multi_test:
+                img, pred_s1, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+            else:
+                img, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+
+            # Debug for multi-test
+            if self.multi_test and is_debug:
+                predCls_s1 = np.argmax(pred_s1, axis=-1)  # predict class using argmax function
+
+                # Save images
+                utils.save_imgs(img_stores=[img, np.expand_dims(predCls_s1[5], axis=0), predCls],
+                                saveDir=os.path.join(save_dir, 'debug'),
+                                img_name=img_name.astype('U26'),
+                                is_vertical=False)
 
             # Save images
             utils.save_imgs(img_stores=[img, predCls],

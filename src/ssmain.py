@@ -19,10 +19,10 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
-tf.flags.DEFINE_string('method', 'U-Net-light-v2',
+tf.flags.DEFINE_string('method', 'U-Net-light-v4',
                        'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3, U-Net-light-v4], '
                        'default: U-Net-light-v3')
-tf.flags.DEFINE_bool('multi_test', False, 'multiple rotation feedforwards for test stage, default: False')
+tf.flags.DEFINE_bool('multi_test', True, 'multiple rotation feedforwards for test stage, default: False')
 tf.flags.DEFINE_integer('batch_size', 16, 'batch size for one iteration, default: 128')
 tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
@@ -78,6 +78,7 @@ def main(_):
     # Initialize solver
     solver = Solver(model=model,
                     data=data,
+                    is_train=FLAGS.is_train,
                     multi_test=FLAGS.multi_test)
 
     # Initialize saver
@@ -132,7 +133,7 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
             # Evaluat models using validation dataset
             if (iterTime % FLAGS.eval_freq) == 0 or (iterTime + 1 == FLAGS.iters):
                 mIoU, acc, _, precision, recall, f1_score = solver.eval(
-                    tb_writer=tb_writer, iter_time=iterTime, save_dir=None, is_test=False)
+                    tb_writer=tb_writer, iter_time=iterTime, save_dir=None)
 
                 if best_acc < acc:
                     best_acc = acc
@@ -194,8 +195,7 @@ def test(solver, saver, modelDir, valDir, testDir, data):
     try:
         mIoU, acc, per_cls_acc, precision, recall, f1_score = solver.eval(tb_writer=None,
                                                                           iter_time=None,
-                                                                          save_dir=valDir,
-                                                                          is_test=True)
+                                                                          save_dir=valDir)
 
         print("\n")
         print("*" * 70)
@@ -209,7 +209,7 @@ def test(solver, saver, modelDir, valDir, testDir, data):
         print("*" * 70)
 
         ################################################################################################################
-        # solver.test_test(save_dir=testDir)
+        solver.test_test(save_dir=testDir)
 
         ################################################################################################################
 
