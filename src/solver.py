@@ -6,6 +6,7 @@
 # -------------------------------------------------------------------------
 import os
 import sys
+import time
 import numpy as np
 import tensorflow as tf
 import utils as utils
@@ -172,12 +173,20 @@ class Solver(object):
             self.model.ratePh: 0.  # rate: 1 - keep_prob
         }
 
+        # Time check
+        total_time = 0.
+
         pred_s1 = None
         for iterTime in range(self.data.numTestImgs):
+            tic = time.time()  # tic
+
             if self.multi_test:
                 img, pred_s1, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
             else:
                 img, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+
+            toc = time.time()  # toc
+            total_time += toc - tic
 
             # Debug for multi-test
             if self.multi_test and is_debug:
@@ -202,6 +211,9 @@ class Solver(object):
 
             if iterTime % 100 == 0:
                 print("- Evaluating progress: {:.2f}%".format((iterTime/self.data.numTestImgs)*100.))
+
+        msg = "Average processing time: {:.2f} msec. for one image"
+        print(msg.format(total_time / self.data.numTestImgs * 1000.))
 
     def sample(self, iterTime, saveDir, num_imgs=8):
         feed = {
