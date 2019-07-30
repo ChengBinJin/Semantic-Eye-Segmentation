@@ -42,8 +42,8 @@ class UNet(object):
             self.conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 128, 128,
                               64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8, self.numClasses]
         elif self.method == 'U-Net-light-v4':
-            self.conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 64, 64,
-                              64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8, self.numClasses]
+            self.conv_dims = [4, 4, 8, 8, 16, 16, 32, 32, 64, 64,
+                              32, 32, 32, 16, 16, 16, 8, 8, 8, 4, 4, 4, self.numClasses]
         else:
             exit(" [!]Cannot find the defined method {} !".format(self.method))
 
