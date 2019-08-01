@@ -215,7 +215,7 @@ class Solver(object):
         msg = "Average processing time: {:.2f} msec. for one image"
         print(msg.format(total_time / self.data.numTestImgs * 1000.))
 
-    def sample(self, iterTime, saveDir, num_imgs=8):
+    def sample(self, iterTime, saveDir, num_imgs=4):
         feed = {
             self.model.ratePh: 0.5  # rate: 1 - keep_prob
         }

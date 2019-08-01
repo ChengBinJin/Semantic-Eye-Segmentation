@@ -17,13 +17,14 @@ from reader import Reader
 class UNet(object):
     def __init__(self, decodeImgShape=(320, 400, 1), outputShape=(320, 200, 1), numClasses=4,
                  dataPath=(None, None), batchSize=1, lr=1e-3, weightDecay=1e-4, totalIters=2e5, isTrain=True,
-                 logDir=None, method=None, multi_test=True, name='UNet'):
+                 logDir=None, method=None, multi_test=True, resize_factor=0.5, name='UNet'):
         self.decodeImgShape = decodeImgShape
         self.inputShape = outputShape
         self.outputShape = outputShape
         self.numClasses = numClasses
         self.method = method
         self.isTrain = isTrain
+        self.resize_factor = resize_factor
 
         self.multi_test = False if self.isTrain else multi_test
         self.degree = 10
@@ -31,19 +32,19 @@ class UNet(object):
 
         if self.method == 'U-Net':
             self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
-                              512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64, self.numClasses]
+                              512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64]
         elif self.method == 'U-Net-light-v1':
             self.conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
-                              256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32, self.numClasses]
+                              256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32]
         elif self.method == 'U-Net-light-v2':
             self.conv_dims = [16, 16, 32, 32, 64, 64, 128, 128, 256, 256,
-                              128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16, self.numClasses]
+                              128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16]
         elif self.method == 'U-Net-light-v3':
             self.conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 128, 128,
-                              64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8, self.numClasses]
+                              64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8]
         elif self.method == 'U-Net-light-v4':
             self.conv_dims = [4, 4, 8, 8, 16, 16, 32, 32, 64, 64,
-                              32, 32, 32, 16, 16, 16, 8, 8, 8, 4, 4, 4, self.numClasses]
+                              32, 32, 32, 16, 16, 16, 8, 8, 8, 4, 4, 4]
         else:
             exit(" [!]Cannot find the defined method {} !".format(self.method))
 
@@ -351,14 +352,34 @@ class UNet(object):
 
     def forward_network(self, inputImg, padding='SAME', reuse=False):
         with tf.compat.v1.variable_scope(self.name, reuse=reuse):
-            # Stage 1
-            tf_utils.print_activations(inputImg, logger=self.logger)
-            s1_conv1 = tf_utils.conv2d(x=inputImg, output_dim=self.conv_dims[0], k_h=3, k_w=3, d_h=1, d_w=1,
-                                       padding=padding, initializer='He', name='s1_conv1', logger=self.logger)
-            s1_conv1 = tf_utils.relu(s1_conv1, name='relu_s1_conv1', logger=self.logger)
-            s1_conv2 = tf_utils.conv2d(x=s1_conv1, output_dim=self.conv_dims[1], k_h=3, k_w=3, d_h=1, d_w=1,
-                                       padding=padding, initializer='He', name='s1_conv2', logger=self.logger)
-            s1_conv2 = tf_utils.relu(s1_conv2, name='relu_s1_conv2', logger=self.logger)
+            # This part is for compatible between input size [640, 400] and [320, 200]
+            if self.resize_factor == 1.0:
+                # Stage 0
+                tf_utils.print_activations(inputImg, logger=self.logger)
+                s0_conv1 = tf_utils.conv2d(x=inputImg, output_dim=self.conv_dims[0], k_h=3, k_w=3, d_h=1, d_w=1,
+                                           padding=padding, initializer='He', name='s0_conv1', logger=self.logger)
+                s0_conv1 = tf_utils.relu(s0_conv1, name='relu_s0_conv1', logger=self.logger)
+                s0_conv2 = tf_utils.conv2d(x=s0_conv1, output_dim=self.conv_dims[0], k_h=3, k_w=3, d_h=1, d_w=1,
+                                           padding=padding, initializer='He', name='s0_conv2', logger=self.logger)
+                s0_conv2 = tf_utils.relu(s0_conv2, name='relu_s0_conv2', logger=self.logger)
+
+                # Stage 1
+                s1_maxpool = tf_utils.max_pool(x=s0_conv2, name='s1_maxpool2d', logger=self.logger)
+                s1_conv1 = tf_utils.conv2d(x=s1_maxpool, output_dim=self.conv_dims[0], k_h=3, k_w=3, d_h=1, d_w=1,
+                                           padding=padding, initializer='He', name='s1_conv1', logger=self.logger)
+                s1_conv1 = tf_utils.relu(s1_conv1, name='relu_s1_conv1', logger=self.logger)
+                s1_conv2 = tf_utils.conv2d(x=s1_conv1, output_dim=self.conv_dims[1], k_h=3, k_w=3, d_h=1, d_w=1,
+                                           padding=padding, initializer='He', name='s1_conv2', logger=self.logger)
+                s1_conv2 = tf_utils.relu(s1_conv2, name='relu_s1_conv2', logger=self.logger)
+            else:
+                # Stage 1
+                tf_utils.print_activations(inputImg, logger=self.logger)
+                s1_conv1 = tf_utils.conv2d(x=inputImg, output_dim=self.conv_dims[0], k_h=3, k_w=3, d_h=1, d_w=1,
+                                           padding=padding, initializer='He', name='s1_conv1', logger=self.logger)
+                s1_conv1 = tf_utils.relu(s1_conv1, name='relu_s1_conv1', logger=self.logger)
+                s1_conv2 = tf_utils.conv2d(x=s1_conv1, output_dim=self.conv_dims[1], k_h=3, k_w=3, d_h=1, d_w=1,
+                                           padding=padding, initializer='He', name='s1_conv2', logger=self.logger)
+                s1_conv2 = tf_utils.relu(s1_conv2, name='relu_s1_conv2', logger=self.logger)
 
             # Stage 2
             s2_maxpool = tf_utils.max_pool(x=s1_conv2, name='s2_maxpool2d', logger=self.logger)
@@ -424,7 +445,8 @@ class UNet(object):
                                            name='s7_deconv1', logger=self.logger)
             s7_deconv1 = tf_utils.relu(s7_deconv1, name='relu_s7_deconv1', logger=self.logger)
             # Concat
-            s7_concat = tf_utils.concat(values=[s7_deconv1, s3_conv2], axis=3, name='s7_axis3_concat', logger=self.logger)
+            s7_concat = tf_utils.concat(values=[s7_deconv1, s3_conv2], axis=3, name='s7_axis3_concat',
+                                        logger=self.logger)
             s7_conv2 = tf_utils.conv2d(x=s7_concat, output_dim=self.conv_dims[14], k_h=3, k_w=3, d_h=1, d_w=1,
                                        padding=padding, initializer='He', name='s7_conv2', logger=self.logger)
             s7_conv2 = tf_utils.relu(s7_conv2, name='relu_s7_conv2', logger=self.logger)
@@ -437,7 +459,8 @@ class UNet(object):
                                            name='s8_deconv1', logger=self.logger)
             s8_deconv1 = tf_utils.relu(s8_deconv1, name='relu_s8_deconv1', logger=self.logger)
             # Concat
-            s8_concat = tf_utils.concat(values=[s8_deconv1,s2_conv2], axis=3, name='s8_axis3_concat', logger=self.logger)
+            s8_concat = tf_utils.concat(values=[s8_deconv1,s2_conv2], axis=3, name='s8_axis3_concat',
+                                        logger=self.logger)
             s8_conv2 = tf_utils.conv2d(x=s8_concat, output_dim=self.conv_dims[17], k_h=3, k_w=3, d_h=1, d_w=1,
                                        padding=padding, initializer='He', name='s8_conv2', logger=self.logger)
             s8_conv2 = tf_utils.relu(s8_conv2, name='relu_s8_conv2', logger=self.logger)
@@ -446,11 +469,12 @@ class UNet(object):
             s8_conv3 = tf_utils.relu(s8_conv3, name='relu_conv3', logger=self.logger)
 
             # Stage 9
-            s9_deconv1 = tf_utils.deconv2d(x=s8_conv3, output_dim=self.conv_dims[19], k_h=2, k_w=2, initializer='He',
-                                           name='s9_deconv1', logger=self.logger)
+            s9_deconv1 = tf_utils.deconv2d(x=s8_conv3, output_dim=self.conv_dims[19], k_h=2, k_w=2,
+                                           initializer='He', name='s9_deconv1', logger=self.logger)
             s9_deconv1 = tf_utils.relu(s9_deconv1, name='relu_s9_deconv1', logger=self.logger)
             # Concat
-            s9_concat = tf_utils.concat(values=[s9_deconv1, s1_conv2], axis=3, name='s9_axis3_concat', logger=self.logger)
+            s9_concat = tf_utils.concat(values=[s9_deconv1, s1_conv2], axis=3, name='s9_axis3_concat',
+                                        logger=self.logger)
             s9_conv2 = tf_utils.conv2d(x=s9_concat, output_dim=self.conv_dims[20], k_h=3, k_w=3, d_h=1, d_w=1,
                                        padding=padding, initializer='He', name='s9_conv2', logger=self.logger)
             s9_conv2 = tf_utils.relu(s9_conv2, name='relu_s9_conv2', logger=self.logger)
@@ -458,7 +482,25 @@ class UNet(object):
                                        padding=padding, initializer='He', name='s9_conv3', logger=self.logger)
             s9_conv3 = tf_utils.relu(s9_conv3, name='relu_s9_conv3', logger=self.logger)
 
-            output = tf_utils.conv2d(s9_conv3, output_dim=self.conv_dims[22], k_h=1, k_w=1, d_h=1, d_w=1, padding=padding,
-                                     initializer='He', name='output', logger=self.logger)
+            if self.resize_factor == 1.0:
+                s10_deconv1 = tf_utils.deconv2d(x=s9_conv3, output_dim=self.conv_dims[-1], k_h=2, k_w=2,
+                                                initializer='He', name='s10_deconv1', logger=self.logger)
+                s10_deconv1 = tf_utils.relu(s10_deconv1, name='relu_s10_deconv1', logger=self.logger)
+                # Concat
+                s10_concat = tf_utils.concat(values=[s10_deconv1, s0_conv2], axis=3, name='s10_axis3_concat',
+                                             logger=self.logger)
+                s10_conv2 = tf_utils.conv2d(s10_concat, output_dim=self.conv_dims[-1], k_h=3, k_w=3, d_h=1, d_w=1,
+                                            padding=padding, initializer='He', name='s10_conv2', logger=self.logger)
+                s10_conv2 = tf_utils.relu(s10_conv2, name='relu_s10_conv2', logger=self.logger)
+                s10_conv3 = tf_utils.conv2d(x=s10_conv2, output_dim=self.conv_dims[-1], k_h=3, k_w=3, d_h=1, d_w=1,
+                                            padding=padding, initializer='He', name='s10_conv3', logger=self.logger)
+                s10_conv3 = tf_utils.relu(s10_conv3, name='relu_s10_conv3', logger=self.logger)
+
+                output = tf_utils.conv2d(s10_conv3, output_dim=self.numClasses, k_h=1, k_w=1, d_h=1, d_w=1,
+                                         padding=padding, initializer='He', name='output', logger=self.logger)
+            else:
+                output = tf_utils.conv2d(s9_conv3, output_dim=self.numClasses, k_h=1, k_w=1, d_h=1, d_w=1,
+                                         padding=padding, initializer='He', name='output', logger=self.logger)
+
             return output
 

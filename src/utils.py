@@ -199,7 +199,7 @@ def convert_color_label(img):
     return img_rgb
 
 
-def save_npy(data, save_dir, file_name):
+def save_npy(data, save_dir, file_name, size=(640, 400)):
     save_dir = os.path.join(save_dir, 'npy')
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
@@ -211,7 +211,7 @@ def save_npy(data, save_dir, file_name):
     data = np.squeeze(data)
 
     # Resize from [H/2, W/2] to [H, W]
-    data = cv2.resize(data, dsize=None, fx=2., fy=2, interpolation=cv2.INTER_NEAREST)
+    data = cv2.resize(data, dsize=size, interpolation=cv2.INTER_NEAREST)
 
     # Convert data type from int32 to uint8
     data = data.astype(np.uint8)
