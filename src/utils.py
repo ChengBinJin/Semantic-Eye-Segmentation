@@ -12,21 +12,65 @@ import numpy as np
 
 
 class JsonData(object):
-    # stage - 0 semantic_segmentation_images
-    # stage - 1 generative_images
-    def __init__(self, file_path, stage=0):
-        file = open(file_path).read()
-        self.json_data = json.loads(file)
-        self.key = 'semantic_segmenation_images' if stage == 0 else "generative_images"
+    def __init__(self):
+        path = "../../Data/OpenEDS/OpenEDS_{}_userID_mapping_to_images.json"
+        self.keys = ["semantic_segmenation_images", "generative_images", "sequence_images"]
 
-    def find_id(self, target):
+        train_file = open(path.format("train")).read()
+        val_file = open(path.format("validation")).read()
+        test_file = open(path.format("test")).read()
+
+        self.train_json_data = json.loads(train_file)
+        self.val_json_data = json.loads(val_file)
+        self.test_json_data = json.loads(test_file)
+
+        # file = open(file_path).read()
+        # self.json_data = json.loads(file)
+        self._collect_user_id()
+
+    def find_id(self, target, data_set="train", key="semantic_segmenation_images"):
         target = target.replace('.npy', '.png')
 
-        for i, item in enumerate(self.json_data):
-            for img_name in item[self.key]:
+        if data_set == "train":
+            json_data = self.train_json_data
+        elif data_set == "validation":
+            json_data = self.val_json_data
+        elif data_set == "test":
+            json_data = self.test_json_data
+        else:
+            raise NotImplementedError
+
+        for i, item in enumerate(json_data):
+            for img_name in item[key]:
                 if img_name == target:
                     user_id = item['id']
                     return user_id
+
+    def _collect_user_id(self):
+        users_list = list()
+        index = 0
+
+        for i, json_data in enumerate([self.train_json_data, self.val_json_data, self.test_json_data]):
+            for item in json_data:
+                user = dict()
+
+                user['id'] = item['id']
+                user['state'] = ["train", "validation", "test"][i]
+                user['index'] = index
+
+                if i != 2:
+                    user['num_of_imgs'] = len(item[self.keys[0]]) + len(item[self.keys[1]]) + len(item[self.keys[2]])
+                else:  # in "generative_images" there are no images
+                    user['num_of_imgs'] = len(item[self.keys[0]]) + len(item[self.keys[2]])
+
+                index += 1
+
+                users_list.append(user)
+
+        self.users_list = sorted(users_list, key=lambda k: k['id'])
+
+    def get_user_ids(self):
+        return self.users_list
 
 
 class SSData(object):

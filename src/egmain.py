@@ -10,6 +10,9 @@ import os
 import tensorflow as tf
 from datetime import datetime
 
+import utils as utils
+
+
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
@@ -35,7 +38,12 @@ def main(_):
     else:
         cur_time = FLAGS.load_model
 
+    model_dir, log_dir, sample_dir, test_dir
+
     # Logger
+    logger = logging.getLogger(__name__)  # logger
+    logger.setLevel(logging.INFO)
+    utils.init_logger(logging)
 
     print("Hello egmain.py!")
 
