@@ -5,6 +5,7 @@
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
 import os
+import csv
 import json
 import logging
 import cv2
@@ -12,9 +13,9 @@ import numpy as np
 
 
 class JsonData(object):
-    def __init__(self):
+    def __init__(self, is_statistics=False):
         path = "../../Data/OpenEDS/OpenEDS_{}_userID_mapping_to_images.json"
-        self.keys = ["semantic_segmenation_images", "generative_images", "sequence_images"]
+        self.keys = ["semantic_segmentation_images", "generative_images", "sequence_images"]
 
         train_file = open(path.format("train")).read()
         val_file = open(path.format("validation")).read()
@@ -24,9 +25,10 @@ class JsonData(object):
         self.val_json_data = json.loads(val_file)
         self.test_json_data = json.loads(test_file)
 
-        # file = open(file_path).read()
-        # self.json_data = json.loads(file)
         self._collect_user_id()
+
+        if is_statistics:
+            self.statistics()
 
     def find_id(self, target, data_set="train", key="semantic_segmenation_images"):
         target = target.replace('.npy', '.png')
@@ -44,7 +46,9 @@ class JsonData(object):
             for img_name in item[key]:
                 if img_name == target:
                     user_id = item['id']
-                    return user_id
+                    return True, user_id
+
+        return False, None
 
     def _collect_user_id(self):
         users_list = list()
@@ -56,7 +60,7 @@ class JsonData(object):
 
                 user['id'] = item['id']
                 user['state'] = ["train", "validation", "test"][i]
-                user['index'] = index
+                user['cls'] = index
 
                 if i != 2:
                     user['num_of_imgs'] = len(item[self.keys[0]]) + len(item[self.keys[1]]) + len(item[self.keys[2]])
@@ -71,6 +75,27 @@ class JsonData(object):
 
     def get_user_ids(self):
         return self.users_list
+
+    def statistics(self):
+        # Initialize csv file
+        f = open('./statistics/User_infor.csv', 'w', encoding='utf-8', newline='')
+        writer = csv.writer(f)
+        # Write tag info
+        writer.writerow(['id', 'cls', 'num_of_imgs', 'state'])
+
+        # Writ to csv file and print info
+        total_imgs = 0
+        for user in self.users_list:
+            # Write
+            writer.writerow([user['id'], int(user['cls']), int(user['num_of_imgs']), user['state']])
+
+            msg = 'ID: {}, Index: {:3d}, Num: {:4d},  State: {}'
+            print(msg.format(user['id'], user['cls'], user['num_of_imgs'], user['state']))
+
+            total_imgs += user['num_of_imgs']
+
+        f.close()
+        print("Total imgs: {}".format(total_imgs))
 
 
 class SSData(object):
@@ -255,7 +280,8 @@ def save_npy(data, save_dir, file_name, size=(640, 400)):
     data = np.squeeze(data)
 
     # Resize from [H/2, W/2] to [H, W]
-    data = cv2.resize(data, dsize=size, interpolation=cv2.INTER_NEAREST)
+    if data.shape[0:2] != size:
+        data = cv2.resize(data, dsize=(size[1], size[0]), interpolation=cv2.INTER_NEAREST)
 
     # Convert data type from int32 to uint8
     data = data.astype(np.uint8)

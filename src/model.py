@@ -29,24 +29,7 @@ class UNet(object):
         self.multi_test = False if self.isTrain else multi_test
         self.degree = 10
         self.num_try = len(range(-self.degree, self.degree+1, 2))  # multi_tes: from -10 degree to 11 degrees
-
-        if self.method == 'U-Net':
-            self.conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
-                              512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64]
-        elif self.method == 'U-Net-light-v1':
-            self.conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
-                              256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32]
-        elif self.method == 'U-Net-light-v2':
-            self.conv_dims = [16, 16, 32, 32, 64, 64, 128, 128, 256, 256,
-                              128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16]
-        elif self.method == 'U-Net-light-v3':
-            self.conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 128, 128,
-                              64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8]
-        elif self.method == 'U-Net-light-v4':
-            self.conv_dims = [4, 4, 8, 8, 16, 16, 32, 32, 64, 64,
-                              32, 32, 32, 16, 16, 16, 8, 8, 8, 4, 4, 4]
-        else:
-            exit(" [!]Cannot find the defined method {} !".format(self.method))
+        self.conv_dims = self.set_conv_dims(self.method)
 
         self.dataPath = dataPath
         self.batchSize = batchSize
@@ -504,3 +487,29 @@ class UNet(object):
 
             return output
 
+    @staticmethod
+    def set_conv_dims(method):
+        conv_dims = None
+
+        if method == 'U-Net':
+            conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
+                         512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64]
+        elif method == 'U-Net-light-v1':
+            conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
+                         256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32]
+        elif method == 'U-Net-light-v2':
+            conv_dims = [16, 16, 32, 32, 64, 64, 128, 128, 256, 256,
+                         128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16]
+        elif method == 'U-Net-light-v3':
+            conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 128, 128,
+                         64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8]
+        elif method == 'U-Net-light-v4':
+            conv_dims = [4, 4, 8, 8, 16, 16, 32, 32, 64, 64,
+                         32, 32, 32, 16, 16, 16, 8, 8, 8, 4, 4, 4]
+        elif method == 'U-Net-light-v4_1':
+            conv_dims = [32, 32, 32, 32, 32, 32, 32, 32, 64, 64,
+                         32, 32, 32, 32, 32, 32, 32, 32, 32, 16, 16, 16]
+        else:
+            exit(" [!]Cannot find the defined method {} !".format(method))
+
+        return conv_dims
