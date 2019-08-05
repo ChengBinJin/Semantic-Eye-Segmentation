@@ -341,7 +341,8 @@ class UNet(object):
         self.tb_total = tf.summary.scalar('Loss/total_loss', self.totalLoss)
         self.tb_data = tf.summary.scalar('Loss/data_loss', self.dataLoss)
         self.tb_reg = tf.summary.scalar('Loss/reg_term', self.regTerm)
-        self.summary_op = tf.summary.merge(inputs=[self.tb_total, self.tb_data, self.tb_reg, self.tb_lr])
+        self.tb_dice = tf.summary.scalar('Loss/dice_loss', self.dice_loss)
+        self.summary_op = tf.summary.merge(inputs=[self.tb_total, self.tb_data, self.tb_reg, self.tb_dice, self.tb_lr])
 
         self.tb_mIoU = tf.summary.scalar('Acc/mIoU', self.mIoU_metric)
         self.tb_accuracy = tf.summary.scalar('Acc/accuracy', self.accuracy_metric)

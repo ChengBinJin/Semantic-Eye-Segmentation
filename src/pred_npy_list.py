@@ -12,9 +12,9 @@ import utils as utils
 
 
 parser = argparse.ArgumentParser(description='make a full path list for the prediciton results')
-parser.add_argument('--method', dest='method', type=str, default='U-Net-light-v4',
+parser.add_argument('--method', dest='method', type=str, default='U-Net-light-v4_1',
                     help='select a method from the list [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3, '
-                         'U-Net-light-v4]')
+                         'U-Net-light-v4, U-Net-light-v4_1]')
 parser.add_argument('--model', dest='model', type=str, default='20190725-161826',
                     help='path pointing predictions of the .npy files')
 parser.add_argument('--show_img', dest='show_img', action='store_true', default=False,
@@ -25,7 +25,7 @@ args = parser.parse_args()
 
 def main(method, model, delay, show_img):
     # Check npy folder exist
-    path = os.path.join('test', method, model, 'npy')
+    path = os.path.join('../test', method, model, 'npy')
     if not os.path.isdir(path):
         exit("Cannot find folder {}...".format(path))
 
