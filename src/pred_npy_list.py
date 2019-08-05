@@ -30,7 +30,7 @@ def main(method, model, delay, show_img):
         exit("Cannot find folder {}...".format(path))
 
     # Make saving-folder of the submit/load_model/pred_npy_list.txt
-    save_path = os.path.join('submit', method, model)
+    save_path = os.path.join('../submit', method, model)
     if not os.path.isdir(save_path):
         os.makedirs(save_path)
 

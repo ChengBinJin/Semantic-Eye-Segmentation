@@ -22,6 +22,8 @@ tf.flags.DEFINE_string('method', 'U-Net-light-v4_1',
 tf.flags.DEFINE_integer('batch_size', 2, 'batch size for one iteration, default: 128')
 tf.flags.DEFINE_float('resize_factor', 1.0, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('multi_test', True, 'multiple rotation feedforwards for test stage, default: False')
+tf.flags.DEFINE_bool('use_dice_loss', True, 'use dice coefficient loss or not, default: False')
+tf.flags.DEFINE_float('lambda_one', 1.0, 'balancing parameter for the dice coefficient loss, default: 1.0')
 
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
@@ -73,6 +75,8 @@ def main(_):
                      method=FLAGS.method,
                      multi_test=FLAGS.multi_test,
                      resize_factor=FLAGS.resize_factor,
+                     use_dice_loss=FLAGS.use_dice_loss,
+                     lambda_one=FLAGS.lambda_one,
                      name='UNet')
 
     # Initialize solver
@@ -115,7 +119,7 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
 
     try:
         while iterTime < FLAGS.iters:
-            _, total_loss, data_loss, reg_term, summary = solver.train()
+            total_loss, data_loss, reg_term, dice_loss, summary = solver.train()
 
             # Write to tensorboard
             tb_writer.add_summary(summary, iterTime)
@@ -123,8 +127,8 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
 
             # Print loss information
             if (iterTime % FLAGS.print_freq == 0) or (iterTime + 1 == FLAGS.iters):
-                msg = "[{0:6} / {1:6}] Total loss: {2:.3f}, Data loss: {3:.3f}, Reg. term: {4:.3f}"
-                print(msg.format(iterTime, FLAGS.iters, total_loss, data_loss, reg_term))
+                msg = "[{0:6} / {1:6}] Total loss: {2:.3f}, Data loss: {3:.3f}, Reg. term: {4:.3f}, Dice term: {5:.3f}"
+                print(msg.format(iterTime, FLAGS.iters, total_loss, data_loss, reg_term, dice_loss))
 
             # Sampling predictive results
             if (iterTime % FLAGS.sample_freq == 0) or (iterTime + 1 == FLAGS.iters):

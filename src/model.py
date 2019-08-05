@@ -17,7 +17,8 @@ from reader import Reader
 class UNet(object):
     def __init__(self, decodeImgShape=(320, 400, 1), outputShape=(320, 200, 1), numClasses=4,
                  dataPath=(None, None), batchSize=1, lr=1e-3, weightDecay=1e-4, totalIters=2e5, isTrain=True,
-                 logDir=None, method=None, multi_test=True, resize_factor=0.5, name='UNet'):
+                 logDir=None, method=None, multi_test=True, resize_factor=0.5, use_dice_loss=False,
+                 lambda_one=1.0, name='UNet'):
         self.decodeImgShape = decodeImgShape
         self.inputShape = outputShape
         self.outputShape = outputShape
@@ -25,6 +26,8 @@ class UNet(object):
         self.method = method
         self.isTrain = isTrain
         self.resize_factor = resize_factor
+        self.use_dice_loss = use_dice_loss
+        self.lambda_one = lambda_one
 
         self.multi_test = False if self.isTrain else multi_test
         self.degree = 10
@@ -83,11 +86,43 @@ class UNet(object):
         self.regTerm = self.weightDecay * tf.math.reduce_mean(
             [tf.nn.l2_loss(weight) for weight in tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES)])
 
+        # Additional loss function
+        # Dice coefficient loss term
+        self.dice_loss = tf.constant(0.)
+        if self.use_dice_loss:
+            self.dice_loss = self.generalized_dice_loss(labels=self.segImgTrain, logits=self.predTrain,
+                                                        hyper_parameter=self.lambda_one)
+
         # Total loss = Data loss + Regularization term
         self.totalLoss = self.dataLoss + self.regTerm
 
         # Optimizer
         self.trainOp = self.init_optimizer(loss=self.totalLoss, name='Adam')
+
+    def generalized_dice_loss(self, labels, logits, hyper_parameter=1.0):
+        # This implementation refers to srcolinas's dice_loss.py
+        # (https://gist.github.com/srcolinas/6df2e5e21c11227a04f826322081addf)
+
+        smooth = 1e-17
+        labels = self.converte_one_hot(labels)
+        logits = tf.nn.softmax(logits)
+
+        # weights = 1.0 / (tf.reduce_sum(labels, axis=[0, 1, 2])**2)
+        weights = tf.math.divide(1.0, (tf.math.square(tf.math.reduce_sum(labels, axis=[0, 1, 2])) + smooth))
+
+        # Numerator part
+        numerator = tf.math.reduce_sum(labels * logits, axis=[0, 1, 2])
+        numerator = tf.reduce_sum(weights * numerator)
+
+        # Denominator part
+        denominator = tf.math.reduce_sum(labels + logits, axis=[0, 1, 2])
+        denominator = tf.math.reduce_sum(weights * denominator)
+
+        # Dice coeeficient loss
+        loss = hyper_parameter * (1.0 - 2.0 * (numerator + smooth) / (denominator + smooth))
+
+        return loss
+
 
     def _init_eval_graph(self):
         # Initialize TFRecoder reader
@@ -328,8 +363,10 @@ class UNet(object):
         return data / 127.5 - 1.0
 
     def converte_one_hot(self, data):
+        shape = data.get_shape().as_list()
         data = tf.dtypes.cast(data, dtype=tf.uint8)
         data = tf.one_hot(data, depth=self.numClasses, axis=-1, dtype=tf.float32, name='one_hot')
+        data = tf.reshape(data, shape=[*shape[:3], self.numClasses])
 
         return data
 

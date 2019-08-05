@@ -78,7 +78,7 @@ class JsonData(object):
 
     def statistics(self):
         # Initialize csv file
-        f = open('./statistics/User_infor.csv', 'w', encoding='utf-8', newline='')
+        f = open('../statistics/User_infor.csv', 'w', encoding='utf-8', newline='')
         writer = csv.writer(f)
         # Write tag info
         writer.writerow(['id', 'cls', 'num_of_imgs', 'state'])
@@ -138,9 +138,9 @@ class SSData(object):
 
 
 def make_folders(isTrain=True, curTime=None, subfolder=None):
-    modelDir = os.path.join('model', subfolder, '{}'.format(curTime))
-    logDir = os.path.join('log', subfolder, '{}'.format(curTime))
-    sampleDir = os.path.join('sample', subfolder, '{}'.format(curTime))
+    modelDir = os.path.join('../model', subfolder, '{}'.format(curTime))
+    logDir = os.path.join('../log', subfolder, '{}'.format(curTime))
+    sampleDir = os.path.join('../sample', subfolder, '{}'.format(curTime))
     valDir, testDir = None, None
 
     if isTrain:
@@ -155,8 +155,8 @@ def make_folders(isTrain=True, curTime=None, subfolder=None):
 
 
     else:
-        valDir = os.path.join('val', subfolder, '{}'.format(curTime))
-        testDir = os.path.join('test', subfolder, '{}'.format(curTime))
+        valDir = os.path.join('../val', subfolder, '{}'.format(curTime))
+        testDir = os.path.join('../test', subfolder, '{}'.format(curTime))
 
         if not os.path.isdir(valDir):
             os.makedirs(valDir)
@@ -199,6 +199,7 @@ def print_main_parameters(logger, flags, isTrain=False):
         logger.info('multi_test: \t\t{}'.format(flags.multi_test))
         logger.info('batch_size: \t\t\t{}'.format(flags.batch_size))
         logger.info('resize_factor: \t\t{}'.format(flags.resize_factor))
+        logger.info('use_dice_loss: \t\t{}'.format(flags.use_dice_loss))
         logger.info('is_train: \t\t\t{}'.format(flags.is_train))
         logger.info('learing_rate: \t\t{}'.format(flags.learning_rate))
         logger.info('weight_decay: \t\t{}'.format(flags.weight_decay))
@@ -214,6 +215,7 @@ def print_main_parameters(logger, flags, isTrain=False):
         print('-- multi_test: \t\t{}'.format(flags.multi_test))
         print('-- batch_size: \t\t{}'.format(flags.batch_size))
         print('-- resize_factor: \t\t{}'.format(flags.resize_factor))
+        print('-- use_dice_loss: \t\t{}'.format(flags.use_dice_loss))
         print('-- is_train: \t\t{}'.format(flags.is_train))
         print('-- learing_rate: \t{}'.format(flags.learning_rate))
         print('-- weight_decay: \t{}'.format(flags.weight_decay))

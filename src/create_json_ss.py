@@ -87,8 +87,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Modification
-    list_file = os.path.join('submit', args.method, args.list_file, 'pred_npy_list.txt')
-    submission_json = os.path.join('submit', args.method, args.list_file, args.submission_json + '.json')
+    list_file = os.path.join('../submit', args.method, args.list_file, 'pred_npy_list.txt')
+    submission_json = os.path.join('../submit', args.method, args.list_file, args.submission_json + '.json')
 
     # create_json_from_npy_data(args.list_file, args.submission_json, args.num_model_param)
     create_json_from_npy_data(list_file, submission_json, args.num_model_param)

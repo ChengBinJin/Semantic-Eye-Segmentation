@@ -18,7 +18,6 @@ class Solver(object):
         self.data = data
         self.is_train = is_train
         self.multi_test = False if self.is_train else multi_test
-
         self._init_session()
         self._init_variables()
 
@@ -33,13 +32,19 @@ class Solver(object):
             self.model.ratePh: 0.5  # rate: 1 - keep_prob
         }
 
-        trainOp = self.model.trainOp
-        totalLoss = self.model.totalLoss
-        dataLoss = self.model.dataLoss
-        regTerm = self.model.regTerm
+        train_op = self.model.trainOp
+        total_loss_op = self.model.totalLoss
+        data_loss_op = self.model.dataLoss
+        reg_term_op = self.model.regTerm
+        dice_loss_op = self.model.dice_loss
         summary_op = self.model.summary_op
 
-        return self.sess.run([trainOp, totalLoss, dataLoss, regTerm, summary_op], feed_dict=feed)
+        _, total_loss, data_loss, reg_term, dice_loss, summary = self.sess.run(
+            [train_op, total_loss_op, data_loss_op, reg_term_op, dice_loss_op, summary_op], feed_dict=feed)
+
+        return total_loss, data_loss, reg_term, dice_loss, summary
+
+
 
     def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_debug=False):
         if self.multi_test:
