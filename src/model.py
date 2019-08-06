@@ -93,8 +93,8 @@ class UNet(object):
             self.dice_loss = self.generalized_dice_loss(labels=self.segImgTrain, logits=self.predTrain,
                                                         hyper_parameter=self.lambda_one)
 
-        # Total loss = Data loss + Regularization term
-        self.totalLoss = self.dataLoss + self.regTerm
+        # Total loss = Data loss + Regularization term + Dice coefficient loss
+        self.totalLoss = self.dataLoss + self.regTerm + self.dice_loss
 
         # Optimizer
         self.trainOp = self.init_optimizer(loss=self.totalLoss, name='Adam')

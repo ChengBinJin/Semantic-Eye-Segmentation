@@ -127,7 +127,7 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
 
             # Print loss information
             if (iterTime % FLAGS.print_freq == 0) or (iterTime + 1 == FLAGS.iters):
-                msg = "[{0:6} / {1:6}] Total loss: {2:.3f}, Data loss: {3:.3f}, Reg. term: {4:.3f}, Dice term: {5:.3f}"
+                msg = "[{0:6} / {1:6}] Total loss:{2:.3f}, Data loss:{3:.3f}, Reg. term:{4:.3f}, Dice loss:{5:.3f}"
                 print(msg.format(iterTime, FLAGS.iters, total_loss, data_loss, reg_term, dice_loss))
 
             # Sampling predictive results
