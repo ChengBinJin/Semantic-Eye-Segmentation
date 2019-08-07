@@ -7,6 +7,54 @@
 import math
 import tensorflow as tf
 
+class ReaderIdentity(object):
+    def __init__(self, tfrecords_file, decode_img_shape=(320, 200, 3), batch_size=1, min_queue_examples=1000, num_threads=8,
+                 name='Identity'):
+        self.tfrecords_file = tfrecords_file
+        self.decode_img_shape = decode_img_shape
+
+        self.min_queue_examples = min_queue_examples
+        self.batch_size = batch_size
+        self.num_threads = num_threads
+        self.reader = tf.TFRecordReader()
+        self.name = name
+
+        # Note: We don't data augmentation for the iris identification
+        self._graph()
+
+    def _graph(self):
+        with tf.compat.v1.variable_scope(self.name):
+            filenameQueue = tf.train.string_input_producer([self.tfrecords_file])
+
+            _, serializedExample = self.reader.read(filenameQueue)
+            features = tf.io.parse_single_example(serializedExample, features={
+                'image/img_name': tf.io.FixedLenFeature([], tf.string),
+                'image/cls_number': tf.io.FixedLenFeature([], tf.string),
+                'image/encoded_image': tf.io.FixedLenFeature([], tf.string)})
+
+            # Buffers
+            img_buffer = features['image/encoded_image']
+            self.cls_number_buffer = features['image/cls_number']
+            self.img_name_buffer = features['image/img_name']
+
+            # Resize to 2D
+            image = tf.image.decode_jpeg(img_buffer, channels=self.decode_img_shape[2])
+            self.img = tf.image.resize(image, size=(self.decode_img_shape[0], self.decode_img_shape[1]))
+
+    def shuffle_batch(self):
+        return tf.train.shuffle_batch(tensors=[self.img, self.cls_number_buffer],
+                                      batch_size=self.batch_size,
+                                      num_threads=self.num_threads,
+                                      capacity=self.min_queue_examples + self.num_threads * self.batch_size,
+                                      min_after_dequeue=self.min_queue_examples)
+
+    def batch(self, multi_test=False):
+        return tf.train.batch(tensors=[self.img, self.cls_number_buffer],
+                              batch_size=self.batch_size,
+                              num_threads=self.num_threads,
+                              capacity=self.min_queue_examples + self.num_threads * self.batch_size,
+                              allow_smaller_final_batch=True)
+
 
 class Reader(object):
     def __init__(self, tfrecordsFile, decodeImgShape=(320, 400, 1), imgShape=(320, 200, 1), batchSize=1,

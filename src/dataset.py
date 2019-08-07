@@ -7,6 +7,38 @@
 import logging
 import utils as utils
 
+class OpenEDS_Identity(object):
+    def __init__(self, name='OpenEDS', track='Identification', is_train=True, resized_factor=0.5, log_dir=None):
+        self.name = name
+        self.track = track
+
+        self.num_train_imgs = 342419
+        self.num_validation_imgs = 12759
+        self.num_identities = 152
+        self.decode_img_shape = (int(640 * resized_factor), int(400 * resized_factor), 3)
+
+        # TFrecprd [atj
+        self.train_path = '../../Data/OpenEDS/{}/train/train.tfrecords'.format(self.track)
+        self.val_path = '../../Data/OpenEDS/{}/validation/validation.tfrecords'.format(self.track)
+
+        if is_train:
+            self.logger = logging.getLogger(__name__)   # logger
+            self.logger.setLevel(logging.INFO)
+            utils.init_logger(logger=self.logger, logDir=log_dir, isTrain=is_train, name='dataset')
+
+            self.logger.info('Dataset name: \t\t{}'.format(self.name))
+            self.logger.info('Dataset track: \t\t{}'.format(self.track))
+            self.logger.info('Num. of training imgs: \t{}'.format(self.num_train_imgs))
+            self.logger.info('Num. of validation imgs: \t{}'.format(self.num_validation_imgs))
+            self.logger.info('Num. of identities: \t\t{}'.format(self.num_identities))
+            self.logger.info('Decode mage shape: \t\t{}'.format(self.decode_img_shape))
+            self.logger.info('Training TFrecord path: \t{}'.format(self.train_path))
+            self.logger.info('Validation TFrecord path: \t{}'.format(self.val_path))
+
+    def __call__(self):
+        return self.train_path, self.val_path
+
+
 class OpenEDS(object):
     def __init__(self, name='OpenEDS', track='Semantic_Segmentation_Dataset',
                  isTrain=True, resizedFactor=0.5, logDir=None):
@@ -59,7 +91,9 @@ class OpenEDS(object):
             return self.testPath, self.valPath, None
 
 def Dataset(name, track='Semantic_Segmentation_Dataset', isTrain=True, resizedFactor=0.5, logDir=None):
-    if name == 'OpenEDS':
+    if name == 'OpenEDS' and track == 'Semantic_Segmentation_Dataset':
         return OpenEDS(name=name, track=track, isTrain=isTrain, resizedFactor=resizedFactor, logDir=logDir)
+    elif name == 'OpenEDS' and track == 'Identification':
+        return OpenEDS_Identity(name=name, track=track, is_train=isTrain, resized_factor=resizedFactor, log_dir=logDir)
     else:
         raise NotImplementedError

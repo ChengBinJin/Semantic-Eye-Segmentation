@@ -152,8 +152,6 @@ def make_folders(isTrain=True, curTime=None, subfolder=None):
 
         if not os.path.isdir(sampleDir):
             os.makedirs(sampleDir)
-
-
     else:
         valDir = os.path.join('../val', subfolder, '{}'.format(curTime))
         testDir = os.path.join('../test', subfolder, '{}'.format(curTime))
@@ -167,7 +165,7 @@ def make_folders(isTrain=True, curTime=None, subfolder=None):
     return modelDir, logDir, sampleDir, valDir, testDir
 
 
-def make_folders_simple(cur_time=None, subfolder=None):
+def make_folders_simple(is_train=True, cur_time=None, subfolder=None):
     model_dir = os.path.join('../model', subfolder, '{}'.format(cur_time))
     log_dir = os.path.join('../log', subfolder, '{}'.format(cur_time))
 
@@ -180,7 +178,7 @@ def make_folders_simple(cur_time=None, subfolder=None):
     return model_dir, log_dir
 
 def init_logger(logger, logDir, name, isTrain):
-    logger.propagate = False  # solve print log multiple times problems
+    logger.propagate = False  # solve print log multiple times problem
     fileHandler, streamHandler = None, None
 
     if isTrain:
