@@ -73,7 +73,7 @@ class ResNet18(object):
         with tf.compat.v1.variable_scope(name):
             global_step = tf.Variable(0., dtype=tf.float32, trainable=False)
             start_learning_rate = self.lr
-            end_leanring_rate = self.lr * 0.01
+            end_leanring_rate = self.lr * 0.001
             start_decay_step = int(self.total_steps * 0.5)
             decay_steps = self.total_steps - start_decay_step
 
