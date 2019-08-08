@@ -38,8 +38,10 @@ class ReaderIdentity(object):
             self.img_name_buffer = features['image/img_name']
 
             # Resize to 2D
-            image = tf.image.decode_jpeg(img_buffer, channels=self.decode_img_shape[2])
-            self.img = tf.image.resize(image, size=(self.decode_img_shape[0], self.decode_img_shape[1]))
+            img = tf.image.decode_jpeg(img_buffer, channels=self.decode_img_shape[2])
+            img = tf.image.resize(img, size=(self.decode_img_shape[0], self.decode_img_shape[1]))
+            # Extract green channel img
+            _, self.img, _ = tf.split(img, num_or_size_splits=[1, 1, 1], axis=-1)
 
     def shuffle_batch(self):
         return tf.train.shuffle_batch(tensors=[self.img, self.cls_number_buffer],

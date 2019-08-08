@@ -89,7 +89,18 @@ def main(_):
                    resizedFactor=FLAGS.resize_factor,
                    logDir=log_dir)
 
-    model = ResNet()
+    # decode_img_shape = (320, 200, 1), num_classes = 152, data_path = (None, None), batch_size = 1, lr = 1e-3,
+    # weight_decay = 1e-4, total_iters = 2e5, is_train = True, log_dir = None, resize_factor = 0.5, name = 'ResNet18'
+    model = ResNet18(decode_img_shape=data.decode_img_shape,
+                     num_classes=data.num_identities,
+                     data_path=data(),
+                     batch_size=FLAGS.batch_size,
+                     lr=FLAGS.learning_rate,
+                     weight_decay=FLAGS.weight_decay,
+                     total_iters=FLAGS.epoch * data.num_train_imgs,
+                     is_train=FLAGS.is_train,
+                     log_dir=log_dir,
+                     resize_factor=FLAGS.resize_factor)
 
     print("Hello iimain.py!")
 

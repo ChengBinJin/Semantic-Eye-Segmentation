@@ -30,7 +30,7 @@ def conv2d(x, output_dim, k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02, initializer=N
         w = tf.compat.v1.get_variable('w', [k_h, k_w, x.get_shape()[-1], output_dim], initializer=init_op)
         conv = tf.nn.conv2d(x, w, strides=[1, d_h, d_w, 1], padding=padding)
 
-        biases = tf.compat.v1.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
+        biases = tf.compat.v1.get_variable('biases', [output_dim], initializer=tf.compat.v1.constant_initializer(0.0))
         # conv = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape())
         conv = tf.nn.bias_add(conv, biases, name='add')
 
@@ -64,7 +64,7 @@ def deconv2d(x, output_dim, k_h=3, k_w=3, d_h=2, d_w=2, stddev=0.02, initializer
         w = tf.compat.v1.get_variable('w', [k_h, k_w, output_dim, input_shape[3]], initializer=init_op)
         deconv = tf.nn.conv2d_transpose(x, w, output_shape=output_shape, strides=[1, d_h, d_w, 1], padding=padding_)
 
-        biases = tf.compat.v1.get_variable('biases', [output_shape[-1]], initializer=tf.constant_initializer(0.0))
+        biases = tf.compat.v1.get_variable('biases', [output_shape[-1]], initializer=tf.compat.v1.constant_initializer(0.0))
         deconv = tf.nn.bias_add(deconv, biases)
 
         if is_print:
@@ -106,7 +106,7 @@ def linear(x, output_size, bias_start=0.0, stddev=0.02, initializer=None, name='
            is_print=True, logger=None):
     shape = x.get_shape().as_list()
 
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         if initializer is None:
             init_op = tf.truncated_normal_initializer(stddev=stddev)
         elif initializer.lower() == 'he':
@@ -116,10 +116,10 @@ def linear(x, output_size, bias_start=0.0, stddev=0.02, initializer=None, name='
         else:
             raise NotImplementedError
 
-        matrix = tf.get_variable(name="matrix", shape=[shape[1], output_size],
-                                 dtype=tf.float32, initializer=init_op)
-        bias = tf.get_variable(name="bias", shape=[output_size],
-                               initializer=tf.constant_initializer(bias_start))
+        matrix = tf.compat.v1.get_variable(name="matrix", shape=[shape[1], output_size],
+                                           dtype=tf.float32, initializer=init_op)
+        bias = tf.compat.v1.get_variable(name="bias", shape=[output_size],
+                                         initializer=tf.compat.v1.constant_initializer(bias_start))
         output = tf.matmul(x, matrix) + bias
 
         if is_print:
@@ -142,31 +142,31 @@ def norm(x, name, _type, _ops, is_train=True, is_print=True, logger=None):
 
 def batch_norm(x, name, _ops, is_train=True, is_print=True, logger=None):
     """Batch normalization."""
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         params_shape = [x.get_shape()[-1]]
 
-        beta = tf.get_variable('beta', params_shape, tf.float32,
-                               initializer=tf.constant_initializer(0.0, tf.float32))
-        gamma = tf.get_variable('gamma', params_shape, tf.float32,
-                                initializer=tf.constant_initializer(1.0, tf.float32))
+        beta = tf.compat.v1.get_variable('beta', params_shape, tf.float32,
+                               initializer=tf.compat.v1.constant_initializer(0.0))
+        gamma = tf.compat.v1.get_variable('gamma', params_shape, tf.float32,
+                                initializer=tf.compat.v1.constant_initializer(1.0))
 
         if is_train is True:
             mean, variance = tf.nn.moments(x, [0, 1, 2], name='moments')
 
-            moving_mean = tf.get_variable('moving_mean', params_shape, tf.float32,
-                                          initializer=tf.constant_initializer(0.0, tf.float32),
+            moving_mean = tf.compat.v1.get_variable('moving_mean', params_shape, tf.float32,
+                                          initializer=tf.compat.v1.constant_initializer(0.0),
                                           trainable=False)
-            moving_variance = tf.get_variable('moving_variance', params_shape, tf.float32,
-                                              initializer=tf.constant_initializer(1.0, tf.float32),
+            moving_variance = tf.compat.v1.get_variable('moving_variance', params_shape, tf.float32,
+                                              initializer=tf.compat.v1.constant_initializer(1.0),
                                               trainable=False)
 
             _ops.append(moving_averages.assign_moving_average(moving_mean, mean, 0.9))
             _ops.append(moving_averages.assign_moving_average(moving_variance, variance, 0.9))
         else:
-            mean = tf.get_variable('moving_mean', params_shape, tf.float32,
-                initializer=tf.constant_initializer(0.0, tf.float32), trainable=False)
-            variance = tf.get_variable('moving_variance', params_shape, tf.float32,
-                initializer=tf.constant_initializer(1.0, tf.float32), trainable=False)
+            mean = tf.compat.v1.get_variable('moving_mean', params_shape, tf.float32,
+                initializer=tf.compat.v1.constant_initializer(0.0), trainable=False)
+            variance = tf.compat.v1.get_variable('moving_variance', params_shape, tf.float32,
+                initializer=tf.compat.v1.constant_initializer(1.0), trainable=False)
 
         # epsilon used to be 1e-5. Maybe 0.001 solves NaN problem in deeper net.
         y = tf.nn.batch_normalization(x, mean, variance, beta, gamma, 1e-5)
@@ -184,7 +184,7 @@ def instance_norm(x, name='instance_norm', mean=1.0, stddev=0.02, epsilon=1e-5, 
         scale = tf.get_variable(
             'scale', [depth], tf.float32,
             initializer=tf.random_normal_initializer(mean=mean, stddev=stddev, dtype=tf.float32))
-        offset = tf.get_variable('offset', [depth], initializer=tf.constant_initializer(0.0))
+        offset = tf.get_variable('offset', [depth], initializer=tf.compat.v1.constant_initializer(0.0))
 
         # calcualte mean and variance as instance
         mean, variance = tf.nn.moments(x, axes=[1, 2], keep_dims=True)
@@ -317,7 +317,7 @@ def max_pool(x, name='max_pool', ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], is_pr
 
 
 def avg_pool(x, name='avg_pool', ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], is_print=True, logger=None):
-    output = tf.nn.avg_pool(value=x, ksize=ksize, strides=strides, padding='SAME', name=name)
+    output = tf.nn.avg_pool2d(x, ksize=ksize, strides=strides, padding='VALID', name=name)
     if is_print:
         print_activations(output, logger)
 
@@ -389,15 +389,15 @@ def xavier_init(in_dim):
 
 def print_activations(t, logger=None):
     if logger is None:
-        print(t.op.name, ': \t\t{}', t.get_shape().as_list())
+        print(t.op.name, ': {}', t.get_shape().as_list())
     else:
-        logger.info(t.op.name + ': \t\t{}'.format(t.get_shape().as_list()))
+        logger.info(t.op.name + ': {}'.format(t.get_shape().as_list()))
 
 
 def show_all_variables(logger=None):
     total_count = 0
 
-    for idx, op in enumerate(tf.trainable_variables()):
+    for idx, op in enumerate(tf.compat.v1.trainable_variables()):
         shape = op.get_shape()
         count = np.prod(shape)
 

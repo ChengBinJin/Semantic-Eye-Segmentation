@@ -28,17 +28,20 @@ class ResNet18(object):
         self.log_dir = log_dir
         self.resize_factor = resize_factor
         self.name = name
-        self.layer = [2, 2, 2, 2]
+        self.layers = [2, 2, 2, 2]
+        self._ops = list()
 
         self.logger = logging.getLogger(__name__)  # logger
         self.logger.setLevel(logging.INFO)
         utils.init_logger(logger=self.logger, logDir=self.log_dir, isTrain=self.is_train, name=self.name)
 
-        # self._build_graph()
+        self._build_graph()
         # self.init_tensorboard()
         tf_utils.show_all_variables(logger=self.logger if self.is_train else None)
 
     def _build_graph(self):
+        self.train_mode = tf.compat.v1.placeholder(dtype=tf.bool, name='train_mode_ph')
+
         # Initialize TFRecoder reader
         train_reader = ReaderIdentity(tfrecords_file=self.data_path[0],
                                       decode_img_shape=self.decode_img_shape,
@@ -58,17 +61,73 @@ class ResNet18(object):
             inputs = tf_utils.max_pool(inputs, name='3x3_maxpool', ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1],
                                        logger=self.logger)
 
+            inputs = self.block_layer(inputs=inputs, filters=64, block_fn=self.bottleneck_block, blocks=self.layers[0],
+                                      strides=1, train_mode=self.train_mode, name='block_layer1')
+            inputs = self.block_layer(inputs=inputs, filters=128, block_fn=self.bottleneck_block, blocks=self.layers[1],
+                                      strides=2, train_mode=self.train_mode, name='block_layer2')
+            inputs = self.block_layer(inputs=inputs, filters=256, block_fn=self.bottleneck_block, blocks=self.layers[2],
+                                      strides=2, train_mode=self.train_mode, name='block_layer3')
+            inputs = self.block_layer(inputs=inputs, filters=512, block_fn=self.bottleneck_block, blocks=self.layers[3],
+                                      strides=2, train_mode=self.train_mode, name='block_layer4')
 
+            inputs = tf_utils.norm(inputs, name='before_gap_batch_norm', _type='batch', _ops=self._ops,
+                                   is_train=self.train_mode, logger=self.logger)
+            inputs = tf_utils.relu(inputs, name='before_gap_relu', logger=self.logger)
+            _, h, w, _ = inputs.get_shape().as_list()
+            inputs = tf_utils.avg_pool(inputs, name='gap', ksize=[1, h, w, 1], strides=[1, 1, 1, 1], logger=self.logger)
+
+            inputs = tf_utils.flatten(inputs, name='flatten', logger=self.logger)
+            logits = tf_utils.linear(inputs, self.num_classes, name='logits')
+
+            return logits
+
+
+    def block_layer(self, inputs, filters, block_fn, blocks, strides, train_mode, name):
+        # Only the first block per block_layer uses projection_shortcut and strides
+        inputs = block_fn(inputs, filters, train_mode, self.projection_shortcut, strides, name + '_1')
+
+        for num_iter in range(1, blocks):
+            inputs = block_fn(inputs, filters, train_mode, None, 1, name=(name + '_' + str(num_iter + 1)))
+
+        return tf.identity(inputs, name)
+
+    def bottleneck_block(self, inputs, filters, train_mode, projection_shortcut, strides, name):
+        with tf.compat.v1.variable_scope(name):
+            shortcut = inputs
+
+            # norm(x, name, _type, _ops, is_train=True, is_print=True, logger=None)
+            inputs = tf_utils.norm(inputs, name='batch_norm_0', _type='batch', _ops=self._ops,
+                                   is_train=train_mode, logger=self.logger)
+            inputs = tf_utils.relu(inputs, name='relu_0', logger=self.logger)
+
+            # The projection shortcut shouldcome after the first batch norm and ReLU since it perofrms a 1x1 convolution.
+            if projection_shortcut is not None:
+                shortcut = self.projection_shortcut(inputs=inputs, filters_out=filters, strides=strides, name='conv_projection')
+
+            inputs = self.conv2d_fixed_padding(inputs=inputs, filters=filters, kernel_size=3, strides=strides, name='conv_0')
+
+            inputs = tf_utils.norm(inputs, name='batch_norm_1', _type='batch', _ops=self._ops,
+                                   is_train=train_mode, logger=self.logger)
+            inputs = tf_utils.relu(inputs, name='relu_1', logger=self.logger)
+            inputs = self.conv2d_fixed_padding(inputs=inputs, filters=filters, kernel_size=3, strides=1, name='conv_1')
+
+            output = tf.identity(inputs + shortcut, name=(name + '_output'))
+            tf_utils.print_activations(output, logger=self.logger)
+
+            return output
+
+    def projection_shortcut(self, inputs, filters_out, strides, name):
+        inputs = self.conv2d_fixed_padding(inputs=inputs, filters=filters_out, kernel_size=1, strides=strides, name=name)
+        return inputs
 
     def conv2d_fixed_padding(self, inputs, filters, kernel_size, strides, name):
-        with tf.compat.v1.variable_scope(name):
-            if strides > 1:
-                inputs = self.fixed_padding(inputs, kernel_size)
+        if strides > 1:
+            inputs = self.fixed_padding(inputs, kernel_size)
 
-            inputs = tf_utils.conv2d(inputs, output_dim=filters, k_h=kernel_size, k_w=kernel_size,
-                                     d_h=strides, d_w=strides, initializer='He',
-                                     padding=('SAME' if strides == 1 else 'VALID'), logger=self.logger)
-            return inputs
+        inputs = tf_utils.conv2d(inputs, output_dim=filters, k_h=kernel_size, k_w=kernel_size,
+                                 d_h=strides, d_w=strides, initializer='He', name=name,
+                                 padding=('SAME' if strides == 1 else 'VALID'), logger=self.logger)
+        return inputs
 
     @staticmethod
     def fixed_padding(inputs, kernel_size):
