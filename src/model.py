@@ -80,7 +80,7 @@ class UNet(object):
         # Data loss
         self.dataLoss = tf.math.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=self.predTrain,
-            labels=self.converte_one_hot(self.segImgTrain)))
+            labels=self.convert_one_hot(self.segImgTrain)))
 
         # Regularization term
         self.regTerm = self.weightDecay * tf.math.reduce_mean(
@@ -104,7 +104,7 @@ class UNet(object):
         # (https://gist.github.com/srcolinas/6df2e5e21c11227a04f826322081addf)
 
         smooth = 1e-17
-        labels = self.converte_one_hot(labels)
+        labels = self.convert_one_hot(labels)
         logits = tf.nn.softmax(logits)
 
         # weights = 1.0 / (tf.reduce_sum(labels, axis=[0, 1, 2])**2)
@@ -363,7 +363,7 @@ class UNet(object):
     def normalize(data):
         return data / 127.5 - 1.0
 
-    def converte_one_hot(self, data):
+    def convert_one_hot(self, data):
         shape = data.get_shape().as_list()
         data = tf.dtypes.cast(data, dtype=tf.uint8)
         data = tf.one_hot(data, depth=self.numClasses, axis=-1, dtype=tf.float32, name='one_hot')

@@ -89,8 +89,6 @@ def main(_):
                    resizedFactor=FLAGS.resize_factor,
                    logDir=log_dir)
 
-    # decode_img_shape = (320, 200, 1), num_classes = 152, data_path = (None, None), batch_size = 1, lr = 1e-3,
-    # weight_decay = 1e-4, total_iters = 2e5, is_train = True, log_dir = None, resize_factor = 0.5, name = 'ResNet18'
     model = ResNet18(decode_img_shape=data.decode_img_shape,
                      num_classes=data.num_identities,
                      data_path=data(),
