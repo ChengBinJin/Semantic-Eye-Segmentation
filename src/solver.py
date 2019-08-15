@@ -29,7 +29,8 @@ class Solver(object):
 
     def train(self):
         feed = {
-            self.model.ratePh: 0.5  # rate: 1 - keep_prob
+            self.model.ratePh: 0.5,  # rate: 1 - keep_prob
+            self.model.trainMode: True
         }
 
         train_op = self.model.trainOp
@@ -78,7 +79,8 @@ class Solver(object):
 
 
         feed = {
-            self.model.ratePh: 0.  # rate: 1 - keep_prob
+            self.model.ratePh: 0.,  # rate: 1 - keep_prob
+            self.model.trainMode: False
         }
 
         # Initialize/reset the running variables
@@ -175,7 +177,8 @@ class Solver(object):
                        self.model.user_id_test]
 
         feed = {
-            self.model.ratePh: 0.  # rate: 1 - keep_prob
+            self.model.ratePh: 0.,  # rate: 1 - keep_prob
+            self.model.trainMode: False
         }
 
         # Time check
@@ -222,7 +225,8 @@ class Solver(object):
 
     def sample(self, iterTime, saveDir, num_imgs=4):
         feed = {
-            self.model.ratePh: 0.5  # rate: 1 - keep_prob
+            self.model.ratePh: 0.5,  # rate: 1 - keep_prob
+            self.model.trainMode: True
         }
 
         img, predCls, segImg = self.sess.run([self.model.imgTrain, self.model.predClsTrain, self.model.segImgTrain],
