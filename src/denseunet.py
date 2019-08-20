@@ -13,18 +13,17 @@ import utils as utils
 import tensorflow_utils as tf_utils
 from reader import Reader
 
-
-class UNet(object):
+class DenseUNet(object):
     def __init__(self, decodeImgShape=(320, 400, 1), outputShape=(320, 200, 1), numClasses=4,
                  dataPath=(None, None), batchSize=1, lr=1e-3, weightDecay=1e-4, totalIters=2e5, isTrain=True,
                  logDir=None, method=None, multi_test=True, resize_factor=0.5, use_dice_loss=False,
-                 lambda_one=1.0, name='UNet'):
+                 use_batch_norm=False, lambda_one=1.0, name='UNet'):
         self.decodeImgShape = decodeImgShape
         self.inputShape = outputShape
         self.outputShape = outputShape
         self.numClasses = numClasses
         self.method = method
-        self.use_batch_norm = False
+        self.use_batch_norm = use_batch_norm
         self.isTrain = isTrain
         self.resize_factor = resize_factor
         self.use_dice_loss = use_dice_loss
@@ -33,7 +32,8 @@ class UNet(object):
         self.multi_test = False if self.isTrain else multi_test
         self.degree = 10
         self.num_try = len(range(-self.degree, self.degree+1, 2))  # multi_tes: from -10 degree to 11 degrees
-        self.conv_dims = self.set_conv_dims(self.method)
+        self.conv_dims = [16, 32, 32, 32, 32, 32, 32, 32, 64, 64,
+                         32, 32, 32, 32, 32, 32, 32, 32, 32, 16, 16, 16]
 
         self.dataPath = dataPath
         self.batchSize = batchSize
@@ -314,12 +314,10 @@ class UNet(object):
                                                      trainable=False)
         self.assign_best_recall = tf.assign(self.best_recall, value=self.best_recall_ph)
 
-        ################################################################################################################
         # # Best f1_score variable
         self.best_f1_score = tf.compat.v1.get_variable(name='best_f1_score', dtype=tf.float32, initializer=tf.constant(0.),
                                                        trainable=False)
         self.assign_best_f1_score = tf.assign(self.best_f1_score, value=self.best_f1_score_ph)
-        ################################################################################################################
 
     def init_optimizer(self, loss, name=None):
         with tf.compat.v1.variable_scope(name):
@@ -353,15 +351,9 @@ class UNet(object):
         self.tb_precision = tf.summary.scalar('Acc/precision', self.precision_metric)
         self.tb_recall = tf.summary.scalar('Acc/recall', self.recall_metric)
 
-        ################################################################################################################
         self.tb_f1_score = tf.summary.scalar('Acc/f1_score', self.f1_score_metric)
         self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
                                                           self.tb_precision, self.tb_recall, self.tb_f1_score])
-
-        # self.metric_summary_op = tf.summary.merge(inputs=[self.tb_mIoU, self.tb_accuracy,
-        #                                                   self.tb_precision, self.tb_recall])
-
-        ################################################################################################################
 
     @staticmethod
     def get_regularization_variables():
@@ -395,7 +387,7 @@ class UNet(object):
                                            padding=padding, initializer='He', name='s0_conv1', logger=self.logger)
                 s0_conv1 = tf_utils.relu(s0_conv1, name='relu_s0_conv1', logger=self.logger)
 
-                s0_conv2 = tf_utils.conv2d(x=s0_conv1, output_dim=self.conv_dims[0], k_h=3, k_w=3, d_h=1, d_w=1,
+                s0_conv2 = tf_utils.conv2d(x=s0_conv1, output_dim=2*self.conv_dims[0], k_h=3, k_w=3, d_h=1, d_w=1,
                                            padding=padding, initializer='He', name='s0_conv2', logger=self.logger)
                 if self.use_batch_norm:
                     s0_conv2 = tf_utils.norm(s0_conv2, name='s0_norm1', _type='batch', _ops=self._ops,
@@ -523,6 +515,9 @@ class UNet(object):
                                          is_train=self.trainMode, logger=self.logger)
             s6_conv2 = tf_utils.relu(s6_conv2, name='relu_s6_conv2', logger=self.logger)
 
+            # Addition
+            s6_conv2 = tf_utils.identity(s6_conv2 + s4_conv1, name='stage6_add', logger=self.logger)
+
             s6_conv3 = tf_utils.conv2d(x=s6_conv2, output_dim=self.conv_dims[12], k_h=3, k_w=3, d_h=1, d_w=1,
                                        padding=padding, initializer='He', name='s6_conv3', logger=self.logger)
             if self.use_batch_norm:
@@ -547,6 +542,9 @@ class UNet(object):
                 s7_conv2 = tf_utils.norm(s7_conv2, name='s7_norm1', _type='batch', _ops=self._ops,
                                          is_train=self.trainMode, logger=self.logger)
             s7_conv2 = tf_utils.relu(s7_conv2, name='relu_s7_conv2', logger=self.logger)
+
+            # Addition
+            s7_conv2 = tf_utils.identity(s7_conv2 + s3_conv1, name='stage7_add', logger=self.logger)
 
             s7_conv3 = tf_utils.conv2d(x=s7_conv2, output_dim=self.conv_dims[15], k_h=3, k_w=3, d_h=1, d_w=1,
                                        padding=padding, initializer='He', name='s7_conv3', logger=self.logger)
@@ -573,6 +571,9 @@ class UNet(object):
                                          is_train=self.trainMode, logger=self.logger)
             s8_conv2 = tf_utils.relu(s8_conv2, name='relu_s8_conv2', logger=self.logger)
 
+            # Addition
+            s8_conv2 = tf_utils.identity(s8_conv2 + s2_conv1, name='stage8_add', logger=self.logger)
+
             s8_conv3 = tf_utils.conv2d(x=s8_conv2, output_dim=self.conv_dims[18], k_h=3, k_w=3, d_h=1, d_w=1,
                                        padding=padding, initializer='He', name='s8_conv3', logger=self.logger)
             if self.use_batch_norm:
@@ -597,6 +598,9 @@ class UNet(object):
                 s9_conv2 = tf_utils.norm(s9_conv2, name='s9_norm1', _type='batch', _ops=self._ops,
                                          is_train=self.trainMode, logger=self.logger)
             s9_conv2 = tf_utils.relu(s9_conv2, name='relu_s9_conv2', logger=self.logger)
+
+            # Addition
+            s9_conv2 = tf_utils.identity(s9_conv2 + s1_conv1, name='stage9_add', logger=self.logger)
 
             s9_conv3 = tf_utils.conv2d(x=s9_conv2, output_dim=self.conv_dims[21], k_h=3, k_w=3, d_h=1, d_w=1,
                                        padding=padding, initializer='He', name='s9_conv3', logger=self.logger)
@@ -623,8 +627,12 @@ class UNet(object):
                                              is_train=self.trainMode, logger=self.logger)
                 s10_conv2 = tf_utils.relu(s10_conv2, name='relu_s10_conv2', logger=self.logger)
 
+                # Addition
+                s10_conv2 = tf_utils.identity(s10_conv2 + s0_conv1, name='s10_add', logger=self.logger)
+
                 s10_conv3 = tf_utils.conv2d(x=s10_conv2, output_dim=self.conv_dims[-1], k_h=3, k_w=3, d_h=1, d_w=1,
                                             padding=padding, initializer='He', name='s10_conv3', logger=self.logger)
+
                 if self.use_batch_norm:
                     s10_conv3 = tf_utils.norm(s10_conv3, name='s10_norm2', _type='batch', _ops=self._ops,
                                              is_train=self.trainMode, logger=self.logger)
@@ -637,33 +645,3 @@ class UNet(object):
                                          padding=padding, initializer='He', name='output', logger=self.logger)
 
             return output
-
-    def set_conv_dims(self, method):
-        conv_dims = None
-
-        if method == 'U-Net':
-            conv_dims = [64, 64, 128, 128, 256, 256, 512, 512, 1024, 1024,
-                         512, 512, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64]
-        elif method == 'U-Net-light-v1':
-            conv_dims = [32, 32, 64, 64, 128, 128, 256, 256, 512, 512,
-                         256, 256, 256, 128, 128, 128, 64, 64, 64, 32, 32, 32]
-        elif method == 'U-Net-light-v2':
-            conv_dims = [16, 16, 32, 32, 64, 64, 128, 128, 256, 256,
-                         128, 128, 128, 64, 64, 64, 32, 32, 32, 16, 16, 16]
-        elif method == 'U-Net-light-v3':
-            conv_dims = [8, 8, 16, 16, 32, 32, 64, 64, 128, 128,
-                         64, 64, 64, 32, 32, 32, 16, 16, 16, 8, 8, 8]
-        elif method == 'U-Net-light-v4':
-            conv_dims = [4, 4, 8, 8, 16, 16, 32, 32, 64, 64,
-                         32, 32, 32, 16, 16, 16, 8, 8, 8, 4, 4, 4]
-        elif method == 'U-Net-light-v4_1':
-            conv_dims = [32, 32, 32, 32, 32, 32, 32, 32, 64, 64,
-                         32, 32, 32, 32, 32, 32, 32, 32, 32, 16, 16, 16]
-        elif method == 'U-Net-light-v4_2':
-            conv_dims = [32, 32, 32, 32, 32, 32, 32, 32, 64, 64,
-                         32, 32, 32, 32, 32, 32, 32, 32, 32, 16, 16, 16]
-            self.use_batch_norm = True
-        else:
-            exit(" [!]Cannot find the defined method {} !".format(method))
-
-        return conv_dims

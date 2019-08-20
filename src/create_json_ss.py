@@ -63,7 +63,7 @@ if __name__ == "__main__":
     parser.add_argument("--method", type=str, dest="method",
                         help="Select a method from [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3, "
                              "U-Net-light-v4, U-Net-light-v4_1]",
-                        default="U-Net-light-v4_1")
+                        default="U-Net-light-v4_2")
     parser.add_argument("--list-file", type=str, dest="list_file",
                         help="Path to text file containing list of FULL FILEPATH of labels saved in .npy format", 
                         default=None)

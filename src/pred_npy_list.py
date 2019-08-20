@@ -12,7 +12,7 @@ import utils as utils
 
 
 parser = argparse.ArgumentParser(description='make a full path list for the prediciton results')
-parser.add_argument('--method', dest='method', type=str, default='U-Net-light-v4_1',
+parser.add_argument('--method', dest='method', type=str, default='U-Net-light-v4_2',
                     help='select a method from the list [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3, '
                          'U-Net-light-v4, U-Net-light-v4_1]')
 parser.add_argument('--model', dest='model', type=str, default='20190725-161826',

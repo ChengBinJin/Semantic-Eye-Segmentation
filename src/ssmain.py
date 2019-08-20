@@ -12,24 +12,27 @@ import tensorflow as tf
 import utils as utils
 from dataset import Dataset
 from model import UNet
+from denseunet import DenseUNet
 from solver import Solver
+
 
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
-tf.flags.DEFINE_string('method', 'U-Net-light-v4_2',
+tf.flags.DEFINE_string('method', 'U-Net-light-v5',
                        'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3, U-Net-light-v4, '
                        'U-Net-light-v4_1, U-Net-light-v4_2], default: U-Net-light-v4_2')
-tf.flags.DEFINE_integer('batch_size', 2, 'batch size for one iteration, default: 128')
+tf.flags.DEFINE_integer('batch_size', 16, 'batch size for one iteration, default: 16')
 tf.flags.DEFINE_float('resize_factor', 1.0, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('multi_test', True, 'multiple rotation feedforwards for test stage, default: False')
 tf.flags.DEFINE_bool('use_dice_loss', True, 'use dice coefficient loss or not, default: False')
+tf.flags.DEFINE_bool('use_batch_norm', False, 'use batch norm for the model, default: False')
 tf.flags.DEFINE_float('lambda_one', 1.0, 'balancing parameter for the dice coefficient loss, default: 1.0')
 
 tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 1e-3, 'initial learning rate for optimizer, default: 0.001')
 tf.flags.DEFINE_float('weight_decay', 1e-4, 'weight decay for model to handle overfitting, default: 0.0001')
-tf.flags.DEFINE_integer('iters', 300000, 'number of iterations, default: 300000')
+tf.flags.DEFINE_integer('iters', 300000, 'number of iterations, default: 300,000')
 tf.flags.DEFINE_integer('print_freq', 50, 'print frequency for loss information, default: 50')
 tf.flags.DEFINE_integer('sample_freq', 500, 'sample frequence for checking qualitative evaluation, default: 500')
 tf.flags.DEFINE_integer('eval_freq', 3000, 'evaluation frequencey for evaluation of the batch accuracy, default: 3000')
@@ -60,8 +63,7 @@ def main(_):
     data = Dataset(name=FLAGS.dataset, isTrain=FLAGS.is_train, resizedFactor=FLAGS.resize_factor, logDir=logDir)
 
     # Initialize model
-    model = None
-    if 'U-Net' in FLAGS.method:
+    if not 'v5' in FLAGS.method:
         model = UNet(decodeImgShape=data.decodeImgShape,
                      outputShape=data.singleImgShape,
                      numClasses=data.numClasses,
@@ -78,6 +80,24 @@ def main(_):
                      use_dice_loss=FLAGS.use_dice_loss,
                      lambda_one=FLAGS.lambda_one,
                      name='UNet')
+    else:
+        model = DenseUNet(decodeImgShape=data.decodeImgShape,
+                          outputShape=data.singleImgShape,
+                          numClasses=data.numClasses,
+                          dataPath=data(isTrain=FLAGS.is_train),
+                          batchSize=FLAGS.batch_size,
+                          lr=FLAGS.learning_rate,
+                          weightDecay=FLAGS.weight_decay,
+                          totalIters=FLAGS.iters,
+                          isTrain=FLAGS.is_train,
+                          logDir=logDir,
+                          method=FLAGS.method,
+                          multi_test=FLAGS.multi_test,
+                          resize_factor=FLAGS.resize_factor,
+                          use_dice_loss=FLAGS.use_dice_loss,
+                          use_batch_norm=FLAGS.use_batch_norm,
+                          lambda_one=FLAGS.lambda_one,
+                          name='DenseUNet')
 
     # Initialize solver
     solver = Solver(model=model,
