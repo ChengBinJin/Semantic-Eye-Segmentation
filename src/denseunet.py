@@ -39,9 +39,10 @@ class DenseUNet(object):
         self.batchSize = batchSize
         self.lr = lr
         self.weightDecay = weightDecay
+
         self.totalSteps = totalIters
-        self.startDecayStep = int(self.totalSteps * 0.5)
-        self.decaySteps = self.totalSteps - self.startDecayStep
+        self.startDecayStep = int(self.totalSteps * 0.25)
+        self.decaySteps = int(self.totalSteps * 0.5)
         self.logDir = logDir
         self.name=name
 
