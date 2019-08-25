@@ -324,7 +324,7 @@ class DenseUNet(object):
         with tf.compat.v1.variable_scope(name):
             globalStep = tf.Variable(0., dtype=tf.float32, trainable=False)
             startLearningRate = self.lr
-            endLearningRate = self.lr * 0.001
+            endLearningRate = self.lr * 0.01
             startDecayStep = self.startDecayStep
             decaySteps = self.decaySteps
 

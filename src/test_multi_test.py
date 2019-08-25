@@ -39,14 +39,21 @@ def test_multi_test(dataPath, decodeImgShape, margin=5, savePath='../debugImgs')
             segImg = np.squeeze(segImg).astype(np.uint8)
 
             num_imgs, h, w = img.shape
+            num_imgs = int(num_imgs / 2)
 
-
-            canvas = np.zeros((2*h+3 *margin, num_imgs*w+(num_imgs+2)*margin, 3), dtype=np.uint8)
+            canvas = np.zeros((4*h+5 *margin, num_imgs*w+(num_imgs+2)*margin, 3), dtype=np.uint8)
             for j in range(num_imgs):
+                # Original img
                 canvas[margin:margin+h, (j+1)*margin+j*w:(j+1)*margin+(j+1)*w, :] = \
                     np.dstack((img[j], img[j], img[j]))
                 canvas[2*margin+h:2*margin+2*h, (j+1)*margin+j*w:(j+1)*(w+margin), :] = \
                     utils.convert_color_label(segImg[j])
+
+                # flipped img
+                canvas[3*margin+2*h:3*margin+3*h, (j+1)*margin+j*w:(j+1)*margin+(j+1)*w, :] = \
+                    np.dstack((img[j+num_imgs], img[j+num_imgs], img[j+num_imgs]))
+                canvas[4*margin+3*h:4*margin+4*h, (j+1)*margin+j*w:(j+1)*(w+margin), :] = \
+                    utils.convert_color_label(segImg[j+num_imgs])
 
             cv2.imshow(winName, canvas)
             if cv2.waitKey(100) & 0xFF == 27:

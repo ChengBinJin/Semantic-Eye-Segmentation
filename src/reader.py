@@ -123,9 +123,11 @@ class Reader(object):
     def multi_test_process(self, imgOri, segImgOri):
         imgs, segImgs = list(), list()
 
-        for degree in range(-10, 11, 2):
-            img, segImg = self.fixed_rotation(imgOri, segImgOri, degree)
-            imgs.append(img), segImgs.append(segImg)
+        for (imgOri_, segImgOri_) in [(imgOri, segImgOri),
+                                     (tf.image.flip_left_right(imgOri), tf.image.flip_left_right(segImgOri))]:
+            for degree in range(-10, 11, 2):
+                img, segImg = self.fixed_rotation(imgOri_, segImgOri_, degree)
+                imgs.append(img), segImgs.append(segImg)
 
         return imgs, segImgs
 

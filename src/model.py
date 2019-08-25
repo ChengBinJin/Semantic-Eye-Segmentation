@@ -138,7 +138,7 @@ class UNet(object):
 
         # Batch for validation data
         imgVal, segImgVal, self.img_name_val, self.user_id_val = valReader.batch(
-            multi_test= False if self.isTrain else self.multi_test)
+            multi_test=False if self.isTrain else self.multi_test)
 
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
@@ -325,7 +325,7 @@ class UNet(object):
         with tf.compat.v1.variable_scope(name):
             globalStep = tf.Variable(0., dtype=tf.float32, trainable=False)
             startLearningRate = self.lr
-            endLearningRate = self.lr * 0.001
+            endLearningRate = self.lr * 0.01
             startDecayStep = self.startDecayStep
             decaySteps = self.decaySteps
 
