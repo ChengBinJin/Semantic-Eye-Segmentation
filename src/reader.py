@@ -129,6 +129,10 @@ class Reader(object):
                 img, segImg = self.fixed_rotation(imgOri_, segImgOri_, degree)
                 imgs.append(img), segImgs.append(segImg)
 
+        # for degree in range(-10, 11, 2):
+        #     img, segImg = self.fixed_rotation(imgOri, segImgOri, degree)
+        #     imgs.append(img), segImgs.append(segImg)
+
         return imgs, segImgs
 
 

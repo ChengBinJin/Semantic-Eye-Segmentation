@@ -144,7 +144,7 @@ class DenseUNet(object):
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
         if self.multi_test:
-            shape = [self.num_try, *self.outputShape]
+            shape = [2*self.num_try, *self.outputShape]
         else:
             shape = [1, *self.outputShape]
 
@@ -152,8 +152,19 @@ class DenseUNet(object):
         imgVal = tf.reshape(imgVal, shape=shape)
         segImgVal = tf.reshape(segImgVal, shape=shape)
 
-        # Network forward for validation data
-        predVal = self.forward_network(inputImg=self.normalize(imgVal), reuse=True)
+        if self.multi_test:
+            # Because of GPU memory we need to split 22 images into two groups and forward independetly
+            # Split test image to two groups
+            n, h, w, c = imgVal.get_shape().as_list()
+            imgVal_1 = tf.slice(imgVal, begin=[0, 0, 0, 0], size=[self.num_try, h, w, c])
+            imgVal_2 = tf.slice(imgVal, begin=[self.num_try, 0, 0, 0], size=[self.num_try, h, w, c])
+
+            # Network forward for validation data
+            predVal_1 = self.forward_network(inputImg=self.normalize(imgVal_1), reuse=True)
+            predVal_2 = self.forward_network(inputImg=self.normalize(imgVal_2), reuse=True)
+            predVal = tf.concat(values=[predVal_1, predVal_2], axis=0)
+        else:
+            predVal = self.forward_network(inputImg=self.normalize(imgVal), reuse=True)
 
         # Since multi_test, we need inversely rotate back to the original segImg
         if self.multi_test:
@@ -223,23 +234,37 @@ class DenseUNet(object):
         if not is_test:
             segImgs = list()
 
-        for idx, degree in enumerate(range(self.degree, -self.degree - 1, -2)):
-            n, h, w, c = imgVal.get_shape().as_list()
+        n, h, w, c = imgVal.get_shape().as_list()
+        n = int(0.5 * n)
 
-            # Extract spectific tensor
-            img = tf.slice(imgVal, begin=[idx, 0, 0, 0], size=[1, h, w, c])                     # [1, H, W, 1]
-            pred = tf.slice(predVal, begin=[idx, 0, 0, 0], size=[1, h, w, self.numClasses])     # [1, H, W, num_classes]
-            if not is_test:
-                segImg = tf.slice(segImgVal, begin=[idx, 0, 0, 0], size=[1, h, w, c])           # [1, H, W, 1]
+        for i in range(2):
+            for idx, degree in enumerate(range(self.degree, -self.degree - 1, -2)):
+                # Extract spectific tensor
+                img = tf.slice(imgVal, begin=[idx + i * n, 0, 0, 0], size=[1, h, w, c])                     # [1, H, W, 1]
+                pred = tf.slice(predVal, begin=[idx + i * n, 0, 0, 0], size=[1, h, w, self.numClasses])     # [1, H, W, num_classes]
+                if not is_test:
+                    segImg = tf.slice(segImgVal, begin=[idx + i * n, 0, 0, 0], size=[1, h, w, c])           # [1, H, W, 1]
 
-            # From degree to radian
-            radian = degree * math.pi / 180.
+                # From degree to radian
+                radian = degree * math.pi / 180.
 
-            # Roate img and segImgs
-            imgs.append(tf.contrib.image.rotate(images=img, angles=radian, interpolation='BILINEAR'))
-            preds.append(tf.contrib.image.rotate(images=pred, angles=radian, interpolation='BILINEAR'))
-            if not is_test:
-                segImgs.append(tf.contrib.image.rotate(images=segImg, angles=radian, interpolation='NEAREST'))
+                # Roate img and segImgs
+                img = tf.contrib.image.rotate(images=img, angles=radian, interpolation='BILINEAR')
+                pred = tf.contrib.image.rotate(images=pred, angles=radian, interpolation='BILINEAR')
+                if not is_test:
+                    segImg = tf.contrib.image.rotate(images=segImg, angles=radian, interpolation='NEAREST')
+
+                if i == 1:
+                    # Flipping flipped images
+                    img = tf.image.flip_left_right(img)
+                    pred = tf.image.flip_left_right(pred)
+                    if not is_test:
+                        segImg = tf.image.flip_left_right(segImg)
+
+                imgs.append(img)
+                preds.append(pred)
+                if not is_test:
+                    segImgs.append(segImg)
 
         if not is_test:
             return tf.concat(imgs, axis=0), tf.concat(preds, axis=0), tf.concat(segImgs, axis=0)
@@ -259,13 +284,24 @@ class DenseUNet(object):
 
         # Convert the shape [?, self.num_try, H, W, 1] to [self.num_try, H, W, 1] for multi-test
         if self.multi_test:
-            shape = [self.num_try, *self.outputShape]
+            shape = [2*self.num_try, *self.outputShape]
         else:
             shape = [1, *self.outputShape]
         imgTest = tf.reshape(imgTest, shape=shape)
 
-        # Network forward for test data
-        predTest = self.forward_network(inputImg=self.normalize(imgTest), reuse=True)
+        if self.multi_test:
+            # Because of GPU memory we need to split 22 images into two groups and forward independetly
+            # Split test image to two groups
+            _, h, w, c = imgTest.get_shape().as_list()
+            imgTest_1 = tf.slice(imgTest, begin=[0, 0, 0, 0], size=[self.num_try, h, w, c])
+            imgTest_2 = tf.slice(imgTest, begin=[self.num_try, 0, 0, 0], size=[self.num_try, h, w, c])
+
+            # Network forward for test data
+            predTest_1 = self.forward_network(inputImg=self.normalize(imgTest_1), reuse=True)
+            predTest_2 = self.forward_network(inputImg=self.normalize(imgTest_2), reuse=True)
+            predTest = tf.concat(values=[predTest_1, predTest_2], axis=0)
+        else:
+            predTest = self.forward_network(inputImg=self.normalize(imgTest), reuse=True)
 
         # Since multi_test, we need inversely rotate back to the original segImg
         if self.multi_test:
@@ -273,7 +309,7 @@ class DenseUNet(object):
             self.imgTest_s1, self.predTest_s1 = imgTest, predTest
 
             # Step 2: inverse-rotated images
-            self.imgTest_s2, self.predTest_s2= self.roate_independently(self.imgTest_s1, self.predTest_s1, is_test=True)
+            self.imgTest_s2, self.predTest_s2 = self.roate_independently(self.imgTest_s1, self.predTest_s1, is_test=True)
 
             # Step 3: combine all results to estimate the final result
             sum_all = tf.math.reduce_sum(self.predTest_s2, axis=0)   # [N, H, W, num_actions] -> [H, W, num_actions]
