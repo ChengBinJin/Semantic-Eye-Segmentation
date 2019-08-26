@@ -220,7 +220,7 @@ def test(solver, saver, modelDir, valDir, testDir, data):
         mIoU, acc, per_cls_acc, precision, recall, f1_score = solver.eval(tb_writer=None,
                                                                           iter_time=None,
                                                                           save_dir=valDir,
-                                                                          is_debug=True)
+                                                                          is_debug=False)
 
         print("\n")
         print("*" * 70)

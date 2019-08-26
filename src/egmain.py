@@ -11,6 +11,7 @@ import tensorflow as tf
 from datetime import datetime
 
 import utils as utils
+from dataset import Dataset
 
 
 FLAGS = tf.flags.FLAGS
@@ -29,6 +30,38 @@ tf.flags.DEFINE_integer('save_freq', 20000, 'save frequency for model, default: 
 tf.flags.DEFINE_string('load_model', None, 'folder of saved model that you wish to continue training '
                                            '(e.g. 20190801-220902), default: None')
 
+
+def print_main_parameters(logger, flags, is_train=False):
+    if is_train:
+        logger.info('gpu_index: \t\t\t{}'.format(flags.gpu_index))
+        logger.info('dataset: \t\t\t{}'.format(flags.dataset))
+        logger.info('method: \t\t\t{}'.format(flags.method))
+        logger.info('batch_size: \t\t\t{}'.format(flags.batch_size))
+        logger.info('resize_factor: \t\t{}'.format(flags.resize_factor))
+        logger.info('is_train: \t\t\t{}'.format(flags.is_train))
+        logger.info('learning_rate: \t\t{}'.format(flags.learning_rate))
+        logger.info('iters: \t\t\t{}'.format(flags.iters))
+        logger.info('print_freq: \t\t\t{}'.format(flags.print_freq))
+        logger.info('sample_freq: \t\t{}'.format(flags.sample_freq))
+        logger.info('sample_batch: \t\t{}'.format(flags.sample_batch))
+        logger.info('save_freq: \t\t\t{}'.format(flags.save_freq))
+        logger.info('load_model: \t\t\t{}'.format(flags.load_model))
+    else:
+        print('-- gpu_index: \t\t\t{}'.format(flags.gpu_index))
+        print('-- dataset: \t\t\t{}'.format(flags.dataset))
+        print('-- method: \t\t\t{}'.format(flags.method))
+        print('-- batch_size: \t\t\t{}'.format(flags.batch_size))
+        print('-- resize_factor: \t\t{}'.format(flags.resize_factor))
+        print('-- is_train: \t\t\t{}'.format(flags.is_train))
+        print('-- learning_rate: \t\t{}'.format(flags.learning_rate))
+        print('-- iters: \t\t\t{}'.format(flags.iters))
+        print('-- print_freq: \t\t\t{}'.format(flags.print_freq))
+        print('-- sample_freq: \t\t{}'.format(flags.sample_freq))
+        print('-- sample_batch: \t\t{}'.format(flags.sample_batch))
+        print('-- save_freq: \t\t\t{}'.format(flags.save_freq))
+        print('-- load_model: \t\t\t{}'.format(flags.load_model))
+
+
 def main(_):
     os.environ["CUDA_VISIBLE_DEVICES"] = FLAGS.gpu_index
 
@@ -38,14 +71,29 @@ def main(_):
     else:
         cur_time = FLAGS.load_model
 
-    model_dir, log_dir, sample_dir, test_dir
+    model_dir, log_dir, sample_dir, _, test_dir = utils.make_folders(isTrain=FLAGS.is_train,
+                                                                     curTime=cur_time,
+                                                                     subfolder=os.path.join('generation', FLAGS.method))
 
     # Logger
     logger = logging.getLogger(__name__)  # logger
     logger.setLevel(logging.INFO)
-    utils.init_logger(logging)
+    utils.init_logger(logger=logger, logDir=log_dir, isTrain=FLAGS.is_train, name='egmain')
+    print_main_parameters(logger, flags=FLAGS, is_train=FLAGS.is_train)
 
-    print("Hello egmain.py!")
+    # Initialize dataset
+    data = Dataset(name=FLAGS.dataset,
+                   track='Generative_Dataset',
+                   isTrain=FLAGS.is_train,
+                   resizedFactor=FLAGS.resize_factor,
+                   logDir=log_dir)
+
+    #     # Initialize dataset
+    #     data = Dataset(name=FLAGS.dataset,
+    #                    track='Identification',
+    #                    isTrain=FLAGS.is_train,
+    #                    resizedFactor=FLAGS.resize_factor,
+    #                    logDir=log_dir)
 
 if __name__ == '__main__':
     tf.compat.v1.app.run()
