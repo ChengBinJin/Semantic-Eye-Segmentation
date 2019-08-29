@@ -22,8 +22,8 @@ class OpenEDS_Generation(object):
         self.num_test_persons = 29
         self.num_classes = 4
 
-        self.decodeImgShape = (int(640 * resized_factor), int(400 * 2 * resized_factor), 1)
-        self.singleImgShape = (int(640 * resized_factor), int(400 * resized_factor), 1)
+        self.decode_img_shape = (int(640 * resized_factor), int(400 * 2 * resized_factor), 1)
+        self.single_img_shape = (int(640 * resized_factor), int(400 * resized_factor), 1)
 
         # TFrecord path
         self.train_path = '../../Data/OpenEDS/{}/train/train.tfrecords'.format(self.track)
@@ -45,8 +45,8 @@ class OpenEDS_Generation(object):
             self.logger.info('Num. of validation persons: \t{}'.format(self.num_val_persons))
             self.logger.info('Num. of test persons: \t{}'.format(self.num_test_persons))
             self.logger.info('Num. of classes: \t\t{}'.format(self.num_classes))
-            self.logger.info('Decode image shape: \t\t{}'.format(self.decodeImgShape))
-            self.logger.info('Single img shape: \t\t{}'.format(self.singleImgShape))
+            self.logger.info('Decode image shape: \t\t{}'.format(self.decode_img_shape))
+            self.logger.info('Single img shape: \t\t{}'.format(self.single_img_shape))
             self.logger.info('Training TFrecord path: \t{}'.format(self.train_path))
             self.logger.info('Validation TFrecord path: \t{}'.format(self.val_path))
             self.logger.info('Test TFrecord path: \t\t{}'.format(self.test_path))

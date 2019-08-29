@@ -12,6 +12,7 @@ from datetime import datetime
 
 import utils as utils
 from dataset import Dataset
+from pix2pix import Pix2pix
 
 
 FLAGS = tf.flags.FLAGS
@@ -20,6 +21,7 @@ tf.flags.DEFINE_string('dataset', 'OpenEDS', 'dataset name, default: OpenEDS')
 tf.flags.DEFINE_string('method', 'pix2pix', 'Generative model [pix2pix], default: pix2pix')
 tf.flags.DEFINE_integer('batch_size', 1, 'batch size for one iteration, default: 1')
 tf.flags.DEFINE_float('resize_factor', 0.5, 'resize original input image, default: 0.5')
+tf.flags.DEFINE_float('lambda_1', 10., 'hyper-paramter for L1 loss of the conditional loss, default: 10.')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for optimizer, default: 0.0002')
 tf.flags.DEFINE_integer('iters', 20, 'number of iterations, default: 200000')
@@ -38,6 +40,7 @@ def print_main_parameters(logger, flags, is_train=False):
         logger.info('method: \t\t\t{}'.format(flags.method))
         logger.info('batch_size: \t\t\t{}'.format(flags.batch_size))
         logger.info('resize_factor: \t\t{}'.format(flags.resize_factor))
+        logger.info('lambda_1: \t\t{}'.format(flags.lambda_1))
         logger.info('is_train: \t\t\t{}'.format(flags.is_train))
         logger.info('learning_rate: \t\t{}'.format(flags.learning_rate))
         logger.info('iters: \t\t\t{}'.format(flags.iters))
@@ -52,6 +55,7 @@ def print_main_parameters(logger, flags, is_train=False):
         print('-- method: \t\t\t{}'.format(flags.method))
         print('-- batch_size: \t\t\t{}'.format(flags.batch_size))
         print('-- resize_factor: \t\t{}'.format(flags.resize_factor))
+        print('-- lambda_1: \t\t{}'.format(flags.lambda_1))
         print('-- is_train: \t\t\t{}'.format(flags.is_train))
         print('-- learning_rate: \t\t{}'.format(flags.learning_rate))
         print('-- iters: \t\t\t{}'.format(flags.iters))
@@ -88,12 +92,19 @@ def main(_):
                    resizedFactor=FLAGS.resize_factor,
                    logDir=log_dir)
 
-    #     # Initialize dataset
-    #     data = Dataset(name=FLAGS.dataset,
-    #                    track='Identification',
-    #                    isTrain=FLAGS.is_train,
-    #                    resizedFactor=FLAGS.resize_factor,
-    #                    logDir=log_dir)
+    # Initialize model
+    model = Pix2pix(decode_img_shape=data.decode_img_shape,
+                    output_shape=data.single_img_shape,
+                    num_classes=data.num_classes,
+                    data_path=data(is_train=FLAGS.is_train),
+                    batch_size=FLAGS.batch_size,
+                    lr=FLAGS.learning_rate,
+                    total_iters=FLAGS.iters,
+                    is_train=FLAGS.is_train,
+                    log_dir=log_dir,
+                    resize_factor=FLAGS.resize_factor,
+                    lambda_1=FLAGS.lambda_1)
+
 
 if __name__ == '__main__':
     tf.compat.v1.app.run()
