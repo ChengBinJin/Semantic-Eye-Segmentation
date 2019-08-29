@@ -52,6 +52,12 @@ class OpenEDS_Generation(object):
             self.logger.info('Test TFrecord path: \t\t{}'.format(self.test_path))
             self.logger.info('Overfitting TFrecord path: \t{}'.format(self.overfitting_path))
 
+    def __call__(self, is_train=True):
+        if is_train:
+            return self.train_path, self.val_path, self.overfitting_path
+        else:
+            return self.test_path, self.val_path, None
+
 
 class OpenEDS_Identity(object):
     def __init__(self, name='OpenEDS', track='Identification', is_train=True, resized_factor=0.5, log_dir=None):

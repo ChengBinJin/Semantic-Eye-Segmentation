@@ -179,24 +179,25 @@ def batch_norm(x, name, _ops, is_train=True, is_print=True, logger=None):
 
 
 def instance_norm(x, name='instance_norm', mean=1.0, stddev=0.02, epsilon=1e-5, is_print=True, logger=None):
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         depth = x.get_shape()[3]
-        scale = tf.get_variable(
+        scale = tf.compat.v1.get_variable(
             'scale', [depth], tf.float32,
-            initializer=tf.random_normal_initializer(mean=mean, stddev=stddev, dtype=tf.float32))
-        offset = tf.get_variable('offset', [depth], initializer=tf.compat.v1.constant_initializer(0.0))
+            #initializer=tf.random_normal_initializer(mean=mean, stddev=stddev, dtype=tf.float32)
+            initializer=tf.truncated_normal_initializer(stddev=stddev))
+        offset = tf.compat.v1.get_variable('offset', [depth], initializer=tf.compat.v1.constant_initializer(0.0))
 
         # calcualte mean and variance as instance
         mean, variance = tf.nn.moments(x, axes=[1, 2], keep_dims=True)
 
         # normalization
-        inv = tf.rsqrt(variance + epsilon)
+        inv = tf.math.rsqrt(variance + epsilon)
         normalized = (x - mean) * inv
 
         output = scale * normalized + offset
 
         if is_print:
-            print_activations(output, logger)
+            print_activations(output, logger=logger)
 
         return output
 
