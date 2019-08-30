@@ -13,6 +13,7 @@ from datetime import datetime
 import utils as utils
 from dataset import Dataset
 from pix2pix import Pix2pix
+from egsolver import Solver
 
 
 FLAGS = tf.flags.FLAGS
@@ -104,6 +105,24 @@ def main(_):
                     log_dir=log_dir,
                     resize_factor=FLAGS.resize_factor,
                     lambda_1=FLAGS.lambda_1)
+
+    # Initialize solver
+    solver = Solver(model=model, data=data, is_train=FLAGS.is_train)
+
+    # Initialize saver
+    saver = tf.compat.v1.train.Saver(max_to_keep=1)
+
+    if FLAGS.is_train is True:
+        train(solver, saver, logger, model_dir, log_dir, sample_dir)
+    else:
+        test(solver, saver, model_dir, test_dir)
+
+
+def train(solver, saver, logger, model_dir, log_dir, sample_dir):
+    print("Hello train!")
+
+def test(solver, saver, model_dir, test_dir):
+    print("Hello test!")
 
 
 if __name__ == '__main__':

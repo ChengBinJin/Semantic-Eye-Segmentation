@@ -134,7 +134,12 @@ class Pix2pix(object):
         return loss
 
     def _init_tensorboard(self):
-        print("Hello _init_tensorboard!")
+        self.tb_gen_loss = tf.summary.scalar('loss/G_loss', self.gen_loss)
+        self.tb_adv_loss = tf.summary.scalar('loss/adv_loss', self.gen_adv_loss)
+        self.tb_cond_loss = tf.summary.scalar('loss/cond_loss', self.cond_loss)
+        self.tb_dis_loss = tf.summary.scalar('loss/D_lss', self.dis_loss)
+        self.summary_op = tf.summary.merge(
+            inputs=[self.tb_gen_loss, self.tb_adv_loss, self.tb_cond_loss, self.tb_dis_loss, self.tb_lr])
 
     def transform_seg(self, img):
         # label 0~3

@@ -13,7 +13,7 @@ import utils as utils
 from dataset import Dataset
 from model import UNet
 from denseunet import DenseUNet
-from solver import Solver
+from sssolver import Solver
 
 
 FLAGS = tf.flags.FLAGS
