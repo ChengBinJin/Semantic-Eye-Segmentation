@@ -119,10 +119,74 @@ def main(_):
 
 
 def train(solver, saver, logger, model_dir, log_dir, sample_dir):
-    print("Hello train!")
+    iter_time = 0
+
+    if FLAGS.load_model is not None:
+        flag, iter_time = load_model(saver=saver, solver=solver, logger=logger, model_dir=model_dir, is_train=True)
+
+        if flag is True:
+            logger.info(' [!] Load Success! Iter: {}'.format(iter_time))
+        else:
+            exit(" [!] Failed to restore model {}".format(FLAGS.load_model))
+
+    # Tensorboard writer
+    tb_writer = tf.compat.v1.summary.FileWriter(logdir=log_dir, graph=solver.sess.graph_def)
+
+    # Threads for tfrecord
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
+
+    try:
+        while iter_time < FLAGS.iters:
+            gen_loss, adv_loss, cond_loss, dis_loss, summary = solver.train()
+
+            # Write to tensorboard
+            tb_writer.add_summary(summary, iter_time)
+            tb_writer.flush()
+
+            if iter_time % FLAGS.print_freq == 0:
+                msg = "[{0:6} / {1:6}] G_loss:{2:.3f}, Adv_loss:{3:.3f}, Cond_loss:{4:.3f}, D_loss: {5:.3f}"
+                print(msg.format(iter_time, FLAGS.iters, gen_loss, adv_loss, cond_loss, dis_loss))
+
+            iter_time += 1
+
+    except KeyboardInterrupt:
+        coord.request_stop()
+    except Exception as e:
+        coord.request_stop(e)
+    except tf.errors.OutOfRangeError:
+        coord.request_stop()
+    finally:
+        # when done, ask the threads to stop
+        coord.request_stop()
+        coord.join(threads)
 
 def test(solver, saver, model_dir, test_dir):
     print("Hello test!")
+
+
+def load_model(saver, solver, logger, model_dir, is_train=False):
+    if is_train:
+        logger.info(' [*] Reading checkpoint...')
+    else:
+        print(' [*] Reading checkpoint...')
+
+    ckpt = tf.train.get_checkpoint_state(model_dir)
+    if ckpt and ckpt.model_checkpoint_path:
+        ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+        saver.restore(solver.sess, os.path.join(model_dir, ckpt_name))
+
+        meta_graph_path = ckpt.model_checkpoint_path + '.meta'
+        iter_time = int(meta_graph_path.split('-')[-1].split('.')[0])
+
+        if is_train:
+            logger.info(' [!] Load Iter: {}'.format(iter_time))
+        else:
+            print(' [!] Load Iter: {}'.format(iter_time))
+
+        return True, iter_time + 1
+    else:
+        return False, None
 
 
 if __name__ == '__main__':

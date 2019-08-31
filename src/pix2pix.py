@@ -66,7 +66,7 @@ class Pix2pix(object):
 
         # Random batch for training
         self.img_train, self.seg_img_train = train_reader.shuffle_batch()
-        self.img_pool_obj = utils.ImagePool(pool_size=50)
+        self.img_pool_obj = utils.ImagePool(pool_size=150)
 
         # Transform img_train and seg_img_train
         trans_seg_img_train = self.transform_seg(self.seg_img_train)

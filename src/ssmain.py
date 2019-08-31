@@ -122,7 +122,7 @@ def train(solver, saver, logger, modelDir, logDir, sampleDir):
             saver=saver, solver=solver, logger=logger, model_dir=modelDir, is_train=True)
 
         if flag is True:
-            logger.info(' [!] Load Sucess! Iter: {}'.format(iterTime))
+            logger.info(' [!] Load Success! Iter: {}'.format(iterTime))
             logger.info('Best mIoU: {:.3f}'.format(best_mIoU))
             logger.info('Best Acc.: {:.3f}'.format(best_acc))
             logger.info('Best Precison: {:.3f}'.format(best_precision))
@@ -264,7 +264,6 @@ def load_model(saver, solver, logger, model_dir, is_train=False):
     if ckpt and ckpt.model_checkpoint_path:
         ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
         saver.restore(solver.sess, os.path.join(model_dir, ckpt_name))
-
 
         meta_graph_path = ckpt.model_checkpoint_path + '.meta'
         iter_time = int(meta_graph_path.split('-')[-1].split('.')[0])
