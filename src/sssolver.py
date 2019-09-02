@@ -45,8 +45,6 @@ class Solver(object):
 
         return total_loss, data_loss, reg_term, dice_loss, summary
 
-
-
     def eval(self, tb_writer=None, iter_time=None, save_dir=None, is_debug=False):
         if self.multi_test:
             run_ops = [self.model.mIoU_metric_update,
