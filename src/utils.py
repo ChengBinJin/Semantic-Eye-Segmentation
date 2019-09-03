@@ -54,7 +54,7 @@ class JsonData(object):
         if is_statistics:
             self.statistics()
 
-    def find_id(self, target, data_set="train", key="semantic_segmenation_images"):
+    def find_id(self, target, data_set="train", key="semantic_segmentation_images"):
         target = target.replace('.npy', '.png')
 
         if data_set == "train":
@@ -133,18 +133,16 @@ class SSData(object):
         print('Number of images in img_paths: {}'.format(len(self.img_paths)))
 
         # Read label paths
-        self.label_paths = None
-        if self.stage.lower() != 'test':
-            self.label_paths = all_files_under(self.dataPath, subfolder='labels', endswith='.npy')
-            print('Number of labels in label_paths: {}'.format(len(self.label_paths)))
+        self.label_paths = all_files_under(self.dataPath, subfolder='labels', endswith='.npy')
+        print('Number of labels in label_paths: {}'.format(len(self.label_paths)))
 
         # Read json file to find user ID
         json_file_path = os.path.join(self.jsonPath, 'OpenEDS_{}_userID_mapping_to_images.json'.format(self.stage))
-        self.jsonDataObj = JsonData(file_path=json_file_path, stage=0)
+        self.jsonDataObj = JsonData()
 
-    def back_info(self, imgPath, labelPath=None):
+    def back_info(self, imgPath, labelPath=None, stage='train'):
         # Find user ID
-        userId = self.jsonDataObj.find_id(target=os.path.basename(imgPath))
+        flage, userId = self.jsonDataObj.find_id(target=os.path.basename(imgPath), data_set=stage)
         # Name of the image
         imgName = os.path.basename(imgPath)
 
@@ -262,17 +260,18 @@ def print_main_parameters(logger, flags, isTrain=False):
         print('-- load_model: \t\t{}'.format(flags.load_model))
 
 
-
 def all_files_under(folder, subfolder='images', endswith='.png'):
     if subfolder is not None:
         new_folder = os.path.join(folder, subfolder)
     else:
         new_folder = folder
 
-    file_names =  [os.path.join(new_folder, fname)
-                   for fname in os.listdir(new_folder) if fname.endswith(endswith)]
-
-    return sorted(file_names)
+    if os.path.isdir(new_folder):
+        file_names =  [os.path.join(new_folder, fname)
+                       for fname in os.listdir(new_folder) if fname.endswith(endswith)]
+        return sorted(file_names)
+    else:
+        return []
 
 
 def init_canvas(h, w, channel, img1, img2, times=1, axis=0):

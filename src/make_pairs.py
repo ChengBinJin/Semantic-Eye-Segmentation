@@ -32,12 +32,8 @@ def main(dataPath, jsonPath, stage):
         if i % 200 == 0:
             print('Processing {} / {}...'.format(i, numImgs))
 
-        if stage.lower() == 'test':
-            labelPath = None
-        else:
-            labelPath = ssDataObj.label_paths[i]
-
-        canvas, userId, imgName = ssDataObj.back_info(imgPath, labelPath)
+        labelPath = ssDataObj.label_paths[i]
+        canvas, userId, imgName = ssDataObj.back_info(imgPath, labelPath, stage=stage)
         save_image(img=canvas, imgName=imgName.replace('.png', '') + '_' + userId,
                    folder=os.path.join(dataPath, stage, 'paired'))
 
