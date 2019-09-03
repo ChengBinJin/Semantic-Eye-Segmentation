@@ -31,7 +31,8 @@ def get_ident_data(state="validation"):
                 folder = os.path.join(root, directory)
                 img_paths = utils.all_files_under(folder, subfolder=None, endswith='.png')
 
-                if (len(img_paths) != 0) & ('paired' not in folder) & ('overfitting' not in folder):
+                if (len(img_paths) != 0) & ('paired' not in folder) & ('overfitting' not in folder) & \
+                        ('train_expand' not in folder):
                     # Add img paths
                     full_img_paths.extend(img_paths)
 
@@ -62,4 +63,4 @@ if __name__ == '__main__':
     # state == 0 for training data
     # state == 1 for validation data
 
-    get_ident_data(state="validation")
+    get_ident_data(state="train")

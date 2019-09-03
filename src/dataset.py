@@ -110,7 +110,7 @@ class OpenEDS(object):
         self.singleImgShape = (int(640 * resizedFactor), int(400 * resizedFactor), 1)
 
         # TFrecord path
-        self.trainPath = '../../Data/OpenEDS/{}/train/train.tfrecords'.format(self.track)
+        self.trainPath = '../../Data/OpenEDS/{}/train_expand/train.tfrecords'.format(self.track)
         self.valPath = '../../Data/OpenEDS/{}/validation/validation.tfrecords'.format(self.track)
         self.testPath = '../../Data/OpenEDS/{}/test/test.tfrecords'.format(self.track)
         self.overfittingPath = '../../Data/OpenEDS/{}/overfitting/overfitting.tfrecords'.format(self.track)

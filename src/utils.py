@@ -262,7 +262,7 @@ def print_main_parameters(logger, flags, isTrain=False):
         print('-- load_model: \t\t{}'.format(flags.load_model))
 
 
-def all_files_under(folder, subfolder='images', endswith='.png'):
+def all_files_under(folder, subfolder=None, endswith='.png'):
     if subfolder is not None:
         new_folder = os.path.join(folder, subfolder)
     else:

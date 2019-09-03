@@ -21,7 +21,7 @@ tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, d
 tf.flags.DEFINE_string('method', 'U-Net-light-v4_2',
                        'Segmentation model [U-Net, U-Net-light-v1, U-Net-light-v2, U-Net-light-v3, U-Net-light-v4, '
                        'U-Net-light-v4_1, U-Net-light-v4_2], default: U-Net-light-v4_2')
-tf.flags.DEFINE_integer('batch_size', 2, 'batch size for one iteration, default: 16')
+tf.flags.DEFINE_integer('batch_size', 1, 'batch size for one iteration, default: 16')
 tf.flags.DEFINE_float('resize_factor', 1.0, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('multi_test', True, 'multiple rotation feedforwards for test stage, default: False')
 tf.flags.DEFINE_bool('use_dice_loss', True, 'use dice coefficient loss or not, default: False')
