@@ -63,6 +63,8 @@ class JsonData(object):
             json_data = self.val_json_data
         elif data_set == "test":
             json_data = self.test_json_data
+        elif data_set == "overfitting":
+            json_data = self.train_json_data
         else:
             raise NotImplementedError
 
@@ -137,7 +139,7 @@ class SSData(object):
         print('Number of labels in label_paths: {}'.format(len(self.label_paths)))
 
         # Read json file to find user ID
-        json_file_path = os.path.join(self.jsonPath, 'OpenEDS_{}_userID_mapping_to_images.json'.format(self.stage))
+        # json_file_path = os.path.join(self.jsonPath, 'OpenEDS_{}_userID_mapping_to_images.json'.format(self.stage))
         self.jsonDataObj = JsonData()
 
     def back_info(self, imgPath, labelPath=None, stage='train'):

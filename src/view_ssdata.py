@@ -22,7 +22,7 @@ parser.add_argument('--json_path', dest='json_path', type=str,
                     help='json file path which includes user ID')
 parser.add_argument('--stage', dest='stage', type=str,
                     default='train',
-                    help='Select one of the stage in [train|validation|test]')
+                    help='Select one of the stage in [train|validation|test|overfitting]')
 parser.add_argument('--delay', dest='delay', type=int,
                     default=1000,
                     help='time delay when showing image')
@@ -35,14 +35,14 @@ parser.add_argument('--save_img', dest='save_img', action='store_true',
 args = parser.parse_args()
 
 
-def show_image(ssData, hPos=10, wPos=10, saveFolder='../debugImgs'):
+def show_image(ssData, state='train', hPos=10, wPos=10, saveFolder='../debugImgs'):
     preUserId = None
     for i, imgPath in enumerate(ssData.img_paths):
         if i % 200 == 0:
             print('Iteration: {:4d}'.format(i))
 
         # Read user ID
-        userId = ssData.jsonDataObj.find_id(target=os.path.basename(imgPath))
+        _, userId = ssData.jsonDataObj.find_id(target=os.path.basename(imgPath), data_set=state)
 
         winName = None
         if not args.hide_img:
@@ -91,4 +91,4 @@ def save_image(img, imgName, folder):
 
 if __name__ == '__main__':
     ssDataObj = SSData(args.data_path, args.json_path, args.stage)
-    show_image(ssDataObj)
+    show_image(ssDataObj, args.stage)
