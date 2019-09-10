@@ -24,6 +24,7 @@ tf.flags.DEFINE_string('method', 'U-Net-light-v4_2',
 tf.flags.DEFINE_integer('batch_size', 1, 'batch size for one iteration, default: 16')
 tf.flags.DEFINE_float('resize_factor', 1.0, 'resize original input image, default: 0.5')
 tf.flags.DEFINE_bool('multi_test', True, 'multiple rotation feedforwards for test stage, default: False')
+tf.flags.DEFINE_bool('advanced_multi_test', False, 'multiple cropping, default: False')
 tf.flags.DEFINE_bool('use_dice_loss', True, 'use dice coefficient loss or not, default: False')
 tf.flags.DEFINE_bool('use_batch_norm', True, 'use batch norm for the model, default: False')
 tf.flags.DEFINE_float('lambda_one', 1.0, 'balancing parameter for the dice coefficient loss, default: 1.0')
@@ -76,6 +77,7 @@ def main(_):
                      logDir=logDir,
                      method=FLAGS.method,
                      multi_test=FLAGS.multi_test,
+                     advanced_multi_test=FLAGS.advanced_multi_test,
                      resize_factor=FLAGS.resize_factor,
                      use_dice_loss=FLAGS.use_dice_loss,
                      lambda_one=FLAGS.lambda_one,
@@ -217,21 +219,21 @@ def test(solver, saver, modelDir, valDir, testDir, data):
     threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
 
     try:
-        mIoU, acc, per_cls_acc, precision, recall, f1_score = solver.eval(tb_writer=None,
-                                                                          iter_time=None,
-                                                                          save_dir=valDir,
-                                                                          is_debug=False)
-
-        print("\n")
-        print("*" * 70)
-        print('mIoU:      {:.3f} - Best mIoU:      {:.3f}'.format(mIoU, best_mIoU))
-        print('Acc.:      {:.3f} - Best Acc.:      {:.3f}'.format(acc, best_acc))
-        print("Precision: {:.3f} - Best Precision: {:.3f}".format(precision, best_precision))
-        print("Recall:    {:.3f} - Best Recall:    {:.3f}".format(recall, best_recall))
-        print("F1 Score:  {:.3f} - Best F1 Score:  {:.3f}".format(f1_score, best_f1_score))
-        for i in range(len(per_cls_acc)):
-            print('Per Class {} Acc.: {:.3f}%'.format(i, per_cls_acc[i]))
-        print("*" * 70)
+        # mIoU, acc, per_cls_acc, precision, recall, f1_score = solver.eval(tb_writer=None,
+        #                                                                   iter_time=None,
+        #                                                                   save_dir=valDir,
+        #                                                                   is_debug=False)
+        #
+        # print("\n")
+        # print("*" * 70)
+        # print('mIoU:      {:.3f} - Best mIoU:      {:.3f}'.format(mIoU, best_mIoU))
+        # print('Acc.:      {:.3f} - Best Acc.:      {:.3f}'.format(acc, best_acc))
+        # print("Precision: {:.3f} - Best Precision: {:.3f}".format(precision, best_precision))
+        # print("Recall:    {:.3f} - Best Recall:    {:.3f}".format(recall, best_recall))
+        # print("F1 Score:  {:.3f} - Best F1 Score:  {:.3f}".format(f1_score, best_f1_score))
+        # for i in range(len(per_cls_acc)):
+        #     print('Per Class {} Acc.: {:.3f}%'.format(i, per_cls_acc[i]))
+        # print("*" * 70)
 
         ################################################################################################################
         solver.test_test(save_dir=testDir)

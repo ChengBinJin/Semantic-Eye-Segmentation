@@ -231,10 +231,11 @@ def print_main_parameters(logger, flags, isTrain=False):
         logger.info('dataset: \t\t\t{}'.format(flags.dataset))
         logger.info('method: \t\t\t{}'.format(flags.method))
         logger.info('multi_test: \t\t{}'.format(flags.multi_test))
+        logger.info('advanced_multi_test: {}'.format(flags.advanced_multi_test))
         logger.info('batch_size: \t\t\t{}'.format(flags.batch_size))
-        logger.info('resize_factor: \t\t{}'.format(flags.resize_factor))
-        logger.info('use_dice_loss: \t\t{}'.format(flags.use_dice_loss))
-        logger.info('use_batch_norm: \t\t{}'.format(flags.use_batch_norm))
+        logger.info('resize_factor: \t{}'.format(flags.resize_factor))
+        logger.info('use_dice_loss: \t{}'.format(flags.use_dice_loss))
+        logger.info('use_batch_norm: \t{}'.format(flags.use_batch_norm))
         logger.info('is_train: \t\t\t{}'.format(flags.is_train))
         logger.info('learing_rate: \t\t{}'.format(flags.learning_rate))
         logger.info('weight_decay: \t\t{}'.format(flags.weight_decay))
@@ -248,10 +249,11 @@ def print_main_parameters(logger, flags, isTrain=False):
         print('-- dataset: \t\t{}'.format(flags.dataset))
         print('-- method: \t\t{}'.format(flags.method))
         print('-- multi_test: \t\t{}'.format(flags.multi_test))
+        print('-- advanced_multi_test: {}'.format(flags.advanced_multi_test))
         print('-- batch_size: \t\t{}'.format(flags.batch_size))
-        print('-- resize_factor: \t\t{}'.format(flags.resize_factor))
-        print('-- use_dice_loss: \t\t{}'.format(flags.use_dice_loss))
-        print('use_batch_norm: \t\t{}'.format(flags.use_batch_norm))
+        print('-- resize_factor: \t{}'.format(flags.resize_factor))
+        print('-- use_dice_loss: \t{}'.format(flags.use_dice_loss))
+        print('-- use_batch_norm: \t{}'.format(flags.use_batch_norm))
         print('-- is_train: \t\t{}'.format(flags.is_train))
         print('-- learing_rate: \t{}'.format(flags.learning_rate))
         print('-- weight_decay: \t{}'.format(flags.weight_decay))
@@ -328,6 +330,38 @@ def save_npy(data, save_dir, file_name, size=(640, 400)):
     # Save data in npy format by requirement
     np.save(os.path.join(save_dir, file_name), data)
 
+def save_imgs_indiv(imgs, w_num_imgs, save_dir=None, img_name=None, name_append='', is_label=False, margin=5):
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
+
+    if is_label:
+        imgs = np.argmax(imgs, axis=3)
+    else:
+        imgs = np.squeeze(imgs).astype(np.uint8)
+
+    num_imgs, h, w = imgs.shape[0:3]
+    h_num_imgs = int(num_imgs // w_num_imgs)
+
+    if is_label:
+        canvas = np.zeros((h_num_imgs * h + (1 + h_num_imgs) * margin, w_num_imgs * w + (w_num_imgs + 1) * margin, 3),
+                          dtype=np.uint8)
+    else:
+        canvas = np.zeros((h_num_imgs * h + (1 + h_num_imgs) * margin, w_num_imgs * w + (w_num_imgs + 1) * margin),
+                          dtype=np.uint8)
+
+
+    for j in range(num_imgs):
+        x_idx = j // w_num_imgs
+        y_idx = j % w_num_imgs
+
+        if is_label:
+            canvas[(x_idx + 1) * margin + x_idx * h:(x_idx + 1) * margin + (x_idx + 1) * h,
+            (y_idx + 1) * margin + y_idx * w:(y_idx + 1) * margin + (y_idx + 1) * w] = convert_color_label(imgs[j])
+        else:
+            canvas[(x_idx + 1) * margin + x_idx * h:(x_idx + 1) * margin + (x_idx + 1) * h,
+            (y_idx + 1) * margin + y_idx * w:(y_idx + 1) * margin + (y_idx + 1) * w] = imgs[j]
+
+    cv2.imwrite(os.path.join(save_dir, name_append + img_name[0]), canvas)
 
 def save_imgs(img_stores, iterTime=None, saveDir=None, margin=5, img_name=None, name_append='', is_vertical=True):
     if not os.path.isdir(saveDir):

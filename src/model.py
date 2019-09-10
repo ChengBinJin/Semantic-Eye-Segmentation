@@ -17,8 +17,8 @@ from reader import Reader
 class UNet(object):
     def __init__(self, decodeImgShape=(320, 400, 1), outputShape=(320, 200, 1), numClasses=4,
                  dataPath=(None, None), batchSize=1, lr=1e-3, weightDecay=1e-4, totalIters=2e5, isTrain=True,
-                 logDir=None, method=None, multi_test=True, resize_factor=0.5, use_dice_loss=False,
-                 lambda_one=1.0, name='UNet'):
+                 logDir=None, method=None, multi_test=True, advanced_multi_test=False, resize_factor=0.5,
+                 use_dice_loss=False, lambda_one=1.0, name='UNet'):
         self.decodeImgShape = decodeImgShape
         self.inputShape = outputShape
         self.outputShape = outputShape
@@ -31,6 +31,7 @@ class UNet(object):
         self.lambda_one = lambda_one
 
         self.multi_test = False if self.isTrain else multi_test
+        self.advanced_multi_test = advanced_multi_test
         self.degree = 10
         self.num_try = len(range(-self.degree, self.degree+1, 2))  # multi_tes: from -10 degree to 11 degrees
         self.conv_dims = self.set_conv_dims(self.method)
@@ -54,10 +55,10 @@ class UNet(object):
         utils.init_logger(logger=self.logger, logDir=self.logDir, isTrain=self.isTrain, name=self.name)
 
         self._build_graph()             # main graph
-        self._init_eval_graph()         # evaluation for validation data
+        # self._init_eval_graph()         # evaluation for validation data
         self._init_test_graph()         # for test data
         self._best_metrics_record()     # metrics
-        self._init_tensorboard()        # tensorboard
+        # self._init_tensorboard()        # tensorboard
         tf_utils.show_all_variables(logger=self.logger if self.isTrain else None)
 
     def _build_graph(self):
@@ -138,7 +139,8 @@ class UNet(object):
 
         # Batch for validation data
         imgVal, segImgVal, self.img_name_val, self.user_id_val = valReader.batch(
-            multi_test= False if self.isTrain else self.multi_test)
+            multi_test= False if self.isTrain else self.multi_test,
+            use_advanced=False if self.isTrain else self.advanced_multi_test)
 
         # tf.train.batch() returns [None, H, M, D]
         # For tf.metrics.mean_iou we need [batch_size, H, M, D]
@@ -227,43 +229,82 @@ class UNet(object):
         # Define initializer to initialie/reset running variables
         self.running_vars_initializer = tf.compat.v1.variables_initializer(var_list=running_vars)
 
-    def roate_independently(self, imgVal, predVal, segImgVal=None, is_test=False):
+    def roate_independently(self, imgVal, predVal, segImgVal=None, is_test=False, h_margin=80, w_margin=50):
         imgs, preds = list(), list()
         segImgs, segImg = None, None
         if not is_test:
             segImgs = list()
 
-        n, h, w, c = imgVal.get_shape().as_list()
-        n = int(0.5 * n)
+        num_imgs, h, w, c = imgVal.get_shape().as_list()
+        n_flip = 2      # num of ori-img and flip-img
+        if self.advanced_multi_test:
+            n_crop = 6      # num of cropped img
+        else:
+            n_crop = 1
+        n_rotate = 11   # num of rotated images
 
-        for i in range(2):
-            for idx, degree in enumerate(range(self.degree, -self.degree - 1, -2)):
-                # Extract spectific tensor
-                img = tf.slice(imgVal, begin=[idx + i * n, 0, 0, 0], size=[1, h, w, c])                     # [1, H, W, 1]
-                pred = tf.slice(predVal, begin=[idx + i * n, 0, 0, 0], size=[1, h, w, self.numClasses])     # [1, H, W, num_classes]
-                if not is_test:
-                    segImg = tf.slice(segImgVal, begin=[idx + i * n, 0, 0, 0], size=[1, h, w, c])           # [1, H, W, 1]
-
-                # From degree to radian
-                radian = degree * math.pi / 180.
-
-                # Roate img and segImgs
-                img = tf.contrib.image.rotate(images=img, angles=radian, interpolation='BILINEAR')
-                pred = tf.contrib.image.rotate(images=pred, angles=radian, interpolation='BILINEAR')
-                if not is_test:
-                    segImg = tf.contrib.image.rotate(images=segImg, angles=radian, interpolation='NEAREST')
-
-                if i == 1:
-                    # Flipping flipped images
-                    img = tf.image.flip_left_right(img)
-                    pred = tf.image.flip_left_right(pred)
+        for i in range(n_flip):         # ori-img and flipped img
+            for j in range(n_crop):     # 6 cropping images
+                for idx, degree in enumerate(range(self.degree, -self.degree - 1, -2)):
+                    # Extract spectific tensor
+                    img = tf.slice(imgVal, begin=[idx + j * n_rotate + i * (n_rotate * n_crop), 0, 0, 0],
+                                   size=[1, h, w, c])                   # [1, H, W, 1]
+                    pred = tf.slice(predVal, begin=[idx + j * n_rotate + i * (n_rotate * n_crop), 0, 0, 0],
+                                    size=[1, h, w, self.numClasses])    # [1, H, W, num_classes]
                     if not is_test:
-                        segImg = tf.image.flip_left_right(segImg)
+                        segImg = tf.slice(segImgVal, begin=[idx + j * n_rotate + i * (n_rotate * n_crop), 0, 0, 0],
+                                          size=[1, h, w, c])            # [1, H, W, 1]
 
-                imgs.append(img)
-                preds.append(pred)
-                if not is_test:
-                    segImgs.append(segImg)
+                    # From degree to radian
+                    radian = degree * math.pi / 180.
+
+                    # Roate img and segImgs
+                    img = tf.contrib.image.rotate(images=img, angles=radian, interpolation='BILINEAR')
+                    pred = tf.contrib.image.rotate(images=pred, angles=radian, interpolation='BILINEAR')
+                    if not is_test:
+                        segImg = tf.contrib.image.rotate(images=segImg, angles=radian, interpolation='NEAREST')
+
+                    if i == 1:
+                        # Flipping flipped images
+                        img = tf.image.flip_left_right(img)
+                        pred = tf.image.flip_left_right(pred)
+                        if not is_test:
+                            segImg = tf.image.flip_left_right(segImg)
+
+                    # Solving cropped image
+                    if j != 0:
+                        # Resize image to the cropped size
+                        img = tf.image.resize(
+                            images=img,
+                            size=(self.outputShape[0] - h_margin, self.outputShape[1] - w_margin),
+                            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+                        pred = tf.image.resize(
+                            images=pred,
+                            size=(self.outputShape[0] - h_margin, self.outputShape[1] - w_margin),
+                            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+                    if j == 1:      # top-left image
+                        img = tf.pad(img, [[0, 0], [0, h_margin], [0, w_margin], [0, 0]], constant_values=0.)
+                        pred = tf.pad(pred, [[0, 0], [0, h_margin], [0, w_margin], [0, 0]], constant_values=0.)
+                    elif j == 2:    # top-right image
+                        img = tf.pad(img, [[0, 0], [0, h_margin], [w_margin, 0], [0, 0]], constant_values=0.)
+                        pred = tf.pad(pred, [[0, 0], [0, h_margin], [w_margin, 0], [0, 0]], constant_values=0.)
+                    elif j == 3:    # centering image
+                        img = tf.pad(img, [[0, 0], [int(h_margin * 0.5), int(h_margin * 0.5)],
+                                           [int(w_margin * 0.5), int(w_margin * 0.5)], [0, 0]], constant_values=0.)
+                        pred = tf.pad(pred, [[0, 0], [int(h_margin * 0.5), int(h_margin * 0.5)],
+                                           [int(w_margin * 0.5), int(w_margin * 0.5)], [0, 0]], constant_values=0.)
+                    elif j == 4:    # bottom-left image
+                        img = tf.pad(img, [[0, 0], [h_margin, 0], [0, w_margin], [0, 0]], constant_values=0.)
+                        pred = tf.pad(pred, [[0, 0], [h_margin, 0], [0, w_margin], [0, 0]], constant_values=0.)
+                    elif j == 5:    # bottom-right image
+                        img = tf.pad(img, [[0, 0], [h_margin, 0], [w_margin, 0], [0, 0]], constant_values=0.)
+                        pred = tf.pad(pred, [[0, 0], [h_margin, 0], [w_margin, 0], [0, 0]], constant_values=0.)
+
+                    imgs.append(img)
+                    preds.append(pred)
+                    if not is_test:
+                        segImgs.append(segImg)
 
         if not is_test:
             return tf.concat(imgs, axis=0), tf.concat(preds, axis=0), tf.concat(segImgs, axis=0)
@@ -276,52 +317,65 @@ class UNet(object):
                             decodeImgShape=self.decodeImgShape,
                             imgShape=self.inputShape,
                             batchSize=1,
+                            minQueueExamples=1,
                             name='test')
 
         # Batch for test data
-        imgTest, _, self.img_name_test, self.user_id_test = testReader.batch(multi_test=self.multi_test)
+        imgTest, _, self.img_name_test, self.user_id_test = testReader.batch(multi_test=self.multi_test,
+                                                                             use_advanced=self.advanced_multi_test)
 
         # Convert the shape [?, self.num_try, H, W, 1] to [self.num_try, H, W, 1] for multi-test
         if self.multi_test:
-            shape = [2*self.num_try, *self.outputShape]
+            if self.advanced_multi_test:
+                shape = [6*2*self.num_try, *self.outputShape]
+            else:
+                shape = [2*self.num_try, *self.outputShape]
         else:
             shape = [1, *self.outputShape]
-        imgTest = tf.reshape(imgTest, shape=shape)
+        self.imgTests = tf.reshape(imgTest, shape=shape)
 
-        if self.multi_test:
-            # Because of GPU memory we need to split 22 images into two groups and forward independetly
-            # Split test image to two groups
-            _, h, w, c = imgTest.get_shape().as_list()
-            imgTest_1 = tf.slice(imgTest, begin=[0, 0, 0, 0], size=[self.num_try, h, w, c])
-            imgTest_2 = tf.slice(imgTest, begin=[self.num_try, 0, 0, 0], size=[self.num_try, h, w, c])
+        self.predTest = self.forward_network(inputImg=self.normalize(self.inputImgPh), reuse=True)
 
-            # Network forward for test data
-            predTest_1 = self.forward_network(inputImg=self.normalize(imgTest_1), reuse=True)
-            predTest_2 = self.forward_network(inputImg=self.normalize(imgTest_2), reuse=True)
-            predTest = tf.concat(values=[predTest_1, predTest_2], axis=0)
-        else:
-            predTest = self.forward_network(inputImg=self.normalize(imgTest), reuse=True)
+        # if self.multi_test:
+        #     # Because of GPU memory we need to split test-images into the multiple groups which each one includes 11 images,
+        #     # and forward independetly
+        #     num_imgs, h, w, c = imgTest.get_shape().as_list()
+        #
+        #     results = list()
+        #     for i in range(0, num_imgs, self.num_try):
+        #         # Separate the into the group
+        #         imgTest_part = tf.slice(imgTest, begin=[i, 0, 0, 0], size=[self.num_try, h, w, c])
+        #         # Network forward for test data
+        #         results.append(self.forward_network(inputImg=self.normalize(imgTest_part), reuse=True))
+        #     self.predTest = tf.concat(values=results, axis=0)
 
-        # Since multi_test, we need inversely rotate back to the original segImg
-        if self.multi_test:
-            # Step 1: original rotated images
-            self.imgTest_s1, self.predTest_s1 = imgTest, predTest
-
-            # Step 2: inverse-rotated images
-            self.imgTest_s2, self.predTest_s2 = self.roate_independently(self.imgTest_s1, self.predTest_s1, is_test=True)
-
-            # Step 3: combine all results to estimate the final result
-            sum_all = tf.math.reduce_sum(self.predTest_s2, axis=0)   # [N, H, W, num_actions] -> [H, W, num_actions]
-            sum_all = tf.expand_dims(sum_all, axis=0)                # [H, W, num_actions] -> [1, H, W, num_actions]
-            predTest_s3 = tf.math.argmax(sum_all, axis=-1)           # [1, H, W]
-
-            _, h, w, c = imgTest.get_shape().as_list()
-            base_id = int(np.floor(self.num_try / 2.))
-            self.imgTest = tf.slice(imgTest, begin=[base_id, 0, 0, 0], size=[1, h, w, c])
-            self.predClsTest = predTest_s3
-        else:
-            self.imgTest = imgTest
-            self.predClsTest = tf.math.argmax(predTest, axis=-1)
+        #     # imgTest_2 = tf.slice(imgTest, begin=[self.num_try, 0, 0, 0], size=[self.num_try, h, w, c])
+        #     # Network forward for test data
+        #     # predTest_1 = self.forward_network(inputImg=self.normalize(imgTest_1), reuse=True)
+        #     # predTest_2 = self.forward_network(inputImg=self.normalize(imgTest_2), reuse=True)
+        # else:
+        #     predTest = self.forward_network(inputImg=self.normalize(imgTest), reuse=True)
+        #
+        # # Since multi_test, we need inversely rotate back to the original segImg
+        # if self.multi_test:
+        #     # Step 1: original rotated images
+        #     self.imgTest_s1, self.predTest_s1 = imgTest, predTest
+        #
+        #     # Step 2: inverse-rotated images
+        #     self.imgTest_s2, self.predTest_s2 = self.roate_independently(self.imgTest_s1, self.predTest_s1, is_test=True)
+        #
+        #     # Step 3: combine all results to estimate the final result
+        #     sum_all = tf.math.reduce_sum(self.predTest_s2, axis=0)   # [N, H, W, num_actions] -> [H, W, num_actions]
+        #     sum_all = tf.expand_dims(sum_all, axis=0)                # [H, W, num_actions] -> [1, H, W, num_actions]
+        #     predTest_s3 = tf.math.argmax(sum_all, axis=-1)           # [1, H, W]
+        #
+        #     _, h, w, c = imgTest.get_shape().as_list()
+        #     base_id = int(np.floor(self.num_try / 2.))
+        #     self.imgTest = tf.slice(imgTest, begin=[base_id, 0, 0, 0], size=[1, h, w, c])
+        #     self.predClsTest = predTest_s3
+        # else:
+        #     self.imgTest = imgTest
+        #     self.predClsTest = tf.math.argmax(predTest, axis=-1)
 
     def _best_metrics_record(self):
         self.best_mIoU_ph = tf.compat.v1.placeholder(tf.float32, name='best_mIoU')

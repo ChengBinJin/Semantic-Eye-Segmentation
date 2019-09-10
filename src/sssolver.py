@@ -5,6 +5,7 @@
 # Email: sbkim0407@gmail.com
 # -------------------------------------------------------------------------
 import os
+import cv2
 import sys
 import time
 import numpy as np
@@ -158,68 +159,89 @@ class Solver(object):
         per_cla_acc_mat *= 100.
 
         return mIoU, accuracy, per_cla_acc_mat, precision, recall, f1_score
+
+    def test_test(self, save_dir, is_debug=True, batch=11):
+        s1_imgs, img_name, user_id = self.sess.run([self.model.imgTests,
+                                                 self.model.img_name_test,
+                                                 self.model.user_id_test])
+        num_imgs, h, w, c = s1_imgs.shape
+
+        s1_preds = list()
+        for i in range(0, num_imgs, batch):
+            pred_imgs = self.sess.run(self.model.predTest, feed_dict={self.model.ratePh: 0.,
+                                                                      self.model.trainMode: False,
+                                                                      self.model.inputImgPh: s1_imgs[i:i+batch]})
+            s1_preds.extend(pred_imgs)
+
+        s1_preds = np.asarray(s1_preds)
+
+        # Save stage 1 results
+        utils.save_imgs_indiv(s1_imgs, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+                              img_name=img_name.astype('U26'), is_label=False, name_append='s1_img_')
+        utils.save_imgs_indiv(s1_preds, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+                              img_name=img_name.astype('U26'), is_label=True, name_append='s1_seg_')
     
-    def test_test(self, save_dir, is_debug=True):
-        print('Number of iterations: {}'.format(self.data.numTestImgs))
-
-        if self.multi_test:
-            run_ops = [self.model.imgTest,
-                       self.model.predTest_s1,
-                       self.model.predClsTest,
-                       self.model.img_name_test,
-                       self.model.user_id_test]
-        else:
-            run_ops = [self.model.imgTest,
-                       self.model.predClsTest,
-                       self.model.img_name_test,
-                       self.model.user_id_test]
-
-        feed = {
-            self.model.ratePh: 0.,  # rate: 1 - keep_prob
-            self.model.trainMode: False
-        }
-
-        # Time check
-        total_time = 0.
-
-        pred_s1 = None
-        for iterTime in range(self.data.numTestImgs):
-            tic = time.time()  # tic
-
-            if self.multi_test:
-                img, pred_s1, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
-            else:
-                img, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
-
-            toc = time.time()  # toc
-            total_time += toc - tic
-
-            # Debug for multi-test
-            if self.multi_test and is_debug:
-                predCls_s1 = np.argmax(pred_s1, axis=-1)  # predict class using argmax function
-
-                # Save images
-                utils.save_imgs(img_stores=[img, np.expand_dims(predCls_s1[5], axis=0), predCls],
-                                saveDir=os.path.join(save_dir, 'debug'),
-                                img_name=img_name.astype('U26'),
-                                is_vertical=False)
-
-            # Save images
-            utils.save_imgs(img_stores=[img, predCls],
-                            saveDir=save_dir,
-                            img_name=img_name.astype('U26'),
-                            is_vertical=False)
-
-            # Write as npy format
-            utils.save_npy(data=predCls,
-                           save_dir=save_dir,
-                           file_name=img_name.astype('U26'))
-
-            if iterTime % 100 == 0:
-                print("- Evaluating progress: {:.2f}%".format((iterTime/self.data.numTestImgs)*100.))
-
-        msg = "Average processing time: {:.2f} msec. for one image"
-        print(msg.format(total_time / self.data.numTestImgs * 1000.))
+    # def test_test(self, save_dir, is_debug=True):
+    #     print('Number of iterations: {}'.format(self.data.numTestImgs))
+    #
+    #     if self.multi_test:
+    #         run_ops = [self.model.imgTest,
+    #                    self.model.predTest_s1,
+    #                    self.model.predClsTest,
+    #                    self.model.img_name_test,
+    #                    self.model.user_id_test]
+    #     else:
+    #         run_ops = [self.model.imgTest,
+    #                    self.model.predClsTest,
+    #                    self.model.img_name_test,
+    #                    self.model.user_id_test]
+    #
+    #     feed = {
+    #         self.model.ratePh: 0.,  # rate: 1 - keep_prob
+    #         self.model.trainMode: False
+    #     }
+    #
+    #     # Time check
+    #     total_time = 0.
+    #
+    #     pred_s1 = None
+    #     for iterTime in range(self.data.numTestImgs):
+    #         tic = time.time()  # tic
+    #
+    #         if self.multi_test:
+    #             img, pred_s1, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+    #         else:
+    #             img, predCls, img_name, user_id = self.sess.run(run_ops, feed_dict=feed)
+    #
+    #         toc = time.time()  # toc
+    #         total_time += toc - tic
+    #
+    #         # Debug for multi-test
+    #         if self.multi_test and is_debug:
+    #             predCls_s1 = np.argmax(pred_s1, axis=-1)  # predict class using argmax function
+    #
+    #             # Save images
+    #             utils.save_imgs(img_stores=[img, np.expand_dims(predCls_s1[5], axis=0), predCls],
+    #                             saveDir=os.path.join(save_dir, 'debug'),
+    #                             img_name=img_name.astype('U26'),
+    #                             is_vertical=False)
+    #
+    #         # Save images
+    #         utils.save_imgs(img_stores=[img, predCls],
+    #                         saveDir=save_dir,
+    #                         img_name=img_name.astype('U26'),
+    #                         is_vertical=False)
+    #
+    #         # Write as npy format
+    #         utils.save_npy(data=predCls,
+    #                        save_dir=save_dir,
+    #                        file_name=img_name.astype('U26'))
+    #
+    #         if iterTime % 100 == 0:
+    #             print("- Evaluating progress: {:.2f}%".format((iterTime/self.data.numTestImgs)*100.))
+    #
+    #     msg = "Average processing time: {:.2f} msec. for one image"
+    #     print(msg.format(total_time / self.data.numTestImgs * 1000.))
 
     def sample(self, iterTime, saveDir, num_imgs=4):
         feed = {

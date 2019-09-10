@@ -93,7 +93,9 @@ class Reader(object):
             image = tf.image.decode_jpeg(imageBuffer, channels=self.imgShape[2])
 
             # Resize to 2D
-            image = tf.image.resize(image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
+            # image = tf.image.resize(image, size=(self.decodeImgShape[0], self.decodeImgShape[1]))
+            image = tf.cast(tf.image.resize(image, size=(self.decodeImgShape[0], self.decodeImgShape[1]),
+                                            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR), dtype=tf.float32)
 
             # Split to two images
             self.imgOri, self.segImgOri = tf.split(image, num_or_size_splits=[self.imgShape[1], self.imgShape[1]],
@@ -108,9 +110,12 @@ class Reader(object):
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
-    def batch(self, multi_test=False):
+    def batch(self, multi_test=False, use_advanced=False):
         if multi_test:
-            img, segImg = self.multi_test_process(self.imgOri, self.segImgOri)
+            if use_advanced:
+                img, segImg = self.multi_test_process_advanced(self.imgOri, self.segImgOri)
+            else:
+                img, segImg = self.multi_test_process(self.imgOri, self.segImgOri)
         else:
             img, segImg = self.imgOri, self.segImgOri
 
@@ -120,6 +125,73 @@ class Reader(object):
                               capacity=self.minQueueExamples + 3 * self.batchSize,
                               allow_smaller_final_batch=True)
 
+    def multi_test_process_advanced(self, imgOri, segImgOri):
+        hMargin = int(self.resizeFactor * self.imgShape[0]) - self.imgShape[0]
+        wMargin = int(self.resizeFactor * self.imgShape[1]) - self.imgShape[1]
+
+        imgs, segImgs = list(), list()
+        flipImgs, flipSegImgs = list(), list()
+
+        # Step1: Cropping & flipping
+        # Original image
+        imgs.append(imgOri); flipImgs.append(tf.image.flip_left_right(imgOri))
+        segImgs.append(segImgOri); flipSegImgs.append(tf.image.flip_left_right(segImgOri))
+
+        # Resized to the bigger image
+        img = tf.image.resize(images=imgOri,
+                              size=(int(self.resizeFactor * self.imgShape[0]),
+                                    int(self.resizeFactor * self.imgShape[1])),
+                              method=tf.image.ResizeMethod.BICUBIC)
+        img = tf.clip_by_value(t=img, clip_value_min=0., clip_value_max=255.)
+
+        segImg = tf.image.resize(images=segImgOri,
+                                 size=(int(self.resizeFactor * self.imgShape[0]),
+                                       int(self.resizeFactor * self.imgShape[1])),
+                                 method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+        # Top-left image
+        tpImg = tf.slice(img, begin=[0, 0, 0], size=[*self.imgShape])
+        imgs.append(tpImg); flipImgs.append(tf.image.flip_left_right(tpImg))
+
+        tpSegImg = tf.slice(segImg, begin=[0, 0, 0], size=[*self.imgShape])
+        segImgs.append(tpSegImg); flipSegImgs.append(tf.image.flip_left_right(tpSegImg))
+
+        # Top-right image
+        trImg = tf.slice(img, begin=[0, wMargin, 0], size=[*self.imgShape])
+        imgs.append(trImg); flipImgs.append(tf.image.flip_left_right(trImg))
+
+        trSegImg = tf.slice(segImg, begin=[0, wMargin, 0], size=[*self.imgShape])
+        segImgs.append(trSegImg); flipSegImgs.append(tf.image.flip_left_right(trSegImg))
+
+        # Center image
+        cImg = tf.slice(img, begin=[int(hMargin * 0.5), int(wMargin * 0.5), 0], size=[*self.imgShape])
+        imgs.append(cImg); flipImgs.append(tf.image.flip_left_right(cImg))
+
+        cSegImg = tf.slice(segImg, begin=[int(hMargin * 0.5), int(wMargin * 0.5), 0], size=[*self.imgShape])
+        segImgs.append(cSegImg); flipSegImgs.append(tf.image.flip_left_right(cSegImg))
+
+        # Bottom-left image
+        blImg = tf.slice(img, begin=[hMargin, 0, 0], size=[*self.imgShape])
+        imgs.append(blImg); flipImgs.append(tf.image.flip_left_right(blImg))
+
+        blSegImg = tf.slice(segImg, begin=[hMargin, 0, 0], size=[*self.imgShape])
+        segImgs.append(blSegImg); flipSegImgs.append(tf.image.flip_left_right(blSegImg))
+
+        # Bottom-right image
+        brImg = tf.slice(img, begin=[hMargin, wMargin, 0], size=[*self.imgShape])
+        imgs.append(brImg); flipImgs.append(tf.image.flip_left_right(brImg))
+
+        brSegImg = tf.slice(segImg, begin=[hMargin, wMargin, 0], size=[*self.imgShape])
+        segImgs.append(brSegImg); flipSegImgs.append(tf.image.flip_left_right(brSegImg))
+
+        imgs_, segImgs_ = list(), list()
+        for imgOri_, segImgOri_ in zip(imgs + flipImgs, segImgs + flipSegImgs):
+            for degree in range(-10, 11, 2):
+                img, segImg = self.fixed_rotation(imgOri_, segImgOri_, degree)
+                imgs_.append(img), segImgs_.append(segImg)
+
+        return imgs_, segImgs_
+
     def multi_test_process(self, imgOri, segImgOri):
         imgs, segImgs = list(), list()
 
@@ -128,10 +200,6 @@ class Reader(object):
             for degree in range(-10, 11, 2):
                 img, segImg = self.fixed_rotation(imgOri_, segImgOri_, degree)
                 imgs.append(img), segImgs.append(segImg)
-
-        # for degree in range(-10, 11, 2):
-        #     img, segImg = self.fixed_rotation(imgOri, segImgOri, degree)
-        #     imgs.append(img), segImgs.append(segImg)
 
         return imgs, segImgs
 
@@ -274,6 +342,15 @@ class Reader(object):
 
     def test_multi_test(self):
         imgs, segImgs = self.multi_test_process(self.imgOri, self.segImgOri)
+
+        return tf.train.shuffle_batch(tensors=[imgs, segImgs],
+                                      batch_size=self.batchSize,
+                                      num_threads=self.numThreads,
+                                      capacity=self.minQueueExamples + 3 * self.batchSize,
+                                      min_after_dequeue=self.minQueueExamples)
+
+    def test_advanced_multi_test(self):
+        imgs, segImgs = self.multi_test_process_advanced(self.imgOri, self.segImgOri)
 
         return tf.train.shuffle_batch(tensors=[imgs, segImgs],
                                       batch_size=self.batchSize,
