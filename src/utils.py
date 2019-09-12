@@ -11,6 +11,7 @@ import json
 import logging
 import cv2
 import numpy as np
+from scipy.ndimage import rotate
 
 
 class ImagePool(object):
@@ -329,6 +330,88 @@ def save_npy(data, save_dir, file_name, size=(640, 400)):
 
     # Save data in npy format by requirement
     np.save(os.path.join(save_dir, file_name), data)
+
+
+def inverse_cropping(imgs, resize_ratio=1.1, batch=11, num_parts=6, is_label=False, num_classes=4):
+    num_imgs, h, w = imgs.shape[0:3]
+    if is_label:
+        new_shape = (batch, int(resize_ratio * h), int(resize_ratio * w), num_classes)
+    else:
+        new_shape = (batch, int(resize_ratio * h), int(resize_ratio * w), 1)
+
+    h_margin = new_shape[1] - h
+    w_margin = new_shape[2] - w
+
+    results = list()
+    for i, p in enumerate(range(0, num_imgs, batch)):
+        canvas = np.zeros(new_shape)
+        resized_canvas = np.zeros((batch, h, w, new_shape[3]))
+
+        part_imgs = imgs[p:p+batch]
+        if np.ndim(part_imgs) == 3:
+            part_imgs = np.expand_dims(part_imgs, axis=3)
+
+        if i % num_parts == 0:      # original
+            results.extend(part_imgs)
+            continue
+        elif i % num_parts == 1:    # top-left
+            canvas[:, :h, :w, :] = part_imgs
+        elif i % num_parts == 2:    # top-right
+            canvas[:, :h, w_margin:, :] = part_imgs
+        elif i % num_parts == 3:    # center
+            canvas[:, int(0.5*h_margin):int(0.5*h_margin)+h, int(0.5*w_margin):int(0.5*w_margin)+w, :] = part_imgs
+        elif i % num_parts == 4:    # bottom-left
+            canvas[:, h_margin:, :w, :] = part_imgs
+        elif i % num_parts == 5:    # bottom-right
+            canvas[:, h_margin:, w_margin:, :] = part_imgs
+
+        for j in range(batch):
+            res_img = cv2.resize(canvas[j], (w, h), cv2.INTER_LINEAR)
+            if np.ndim(res_img) == 2:
+                res_img = np.expand_dims(res_img, axis=2)
+            resized_canvas[j] = res_img
+
+        results.extend(resized_canvas)
+
+    return np.asarray(results)
+
+
+def inverse_flip(imgs):
+    num_imgs = imgs.shape[0]
+    num_half = int(0.5 * num_imgs)
+
+    results = list()
+    for i in range(num_imgs):
+        img = np.squeeze(imgs[i].copy())
+
+        if i >= num_half:
+            # Vertical-axis flipping
+            img = cv2.flip(img, flipCode=1)
+
+        results.extend([img])
+
+    return np.asarray(results)
+
+
+def inverse_rotate(imgs, max_degree=10, interval=2, batch=11, is_label=False):
+    num_imgs = imgs.shape[0]
+
+    results = list()
+    for i in range(0, num_imgs, batch):
+        part_imgs = imgs[i:i+batch].copy()
+
+        for idx, degree in enumerate(range(max_degree, -max_degree - 1, -interval)):
+            if is_label:
+                img_rotate = rotate(input=part_imgs[idx], angle=degree, axes=(0, 1), reshape=False, order=3,
+                                    mode='constant', cval=0.)
+            else:
+                img_rotate = rotate(input=part_imgs[idx], angle=degree, axes=(0, 1), reshape=False, order=3,
+                                mode='constant', cval=0.)
+                img_rotate = np.clip(img_rotate, a_min=0., a_max=255.)
+
+            results.extend([img_rotate])
+
+    return np.asarray(results)
 
 def save_imgs_indiv(imgs, w_num_imgs, save_dir=None, img_name=None, name_append='', is_label=False, margin=5):
     if not os.path.isdir(save_dir):

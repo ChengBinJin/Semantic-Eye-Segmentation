@@ -161,25 +161,72 @@ class Solver(object):
         return mIoU, accuracy, per_cla_acc_mat, precision, recall, f1_score
 
     def test_test(self, save_dir, is_debug=True, batch=11):
-        s1_imgs, img_name, user_id = self.sess.run([self.model.imgTests,
-                                                 self.model.img_name_test,
-                                                 self.model.user_id_test])
-        num_imgs, h, w, c = s1_imgs.shape
+        for iter_time in range(self.data.numTestImgs):
+            print('iter_time: {}'.format(iter_time))
+            s1_imgs, img_name, user_id = self.sess.run([self.model.imgTests,
+                                                     self.model.img_name_test,
+                                                     self.model.user_id_test])
+            num_imgs, h, w, c = s1_imgs.shape
 
-        s1_preds = list()
-        for i in range(0, num_imgs, batch):
-            pred_imgs = self.sess.run(self.model.predTest, feed_dict={self.model.ratePh: 0.,
-                                                                      self.model.trainMode: False,
-                                                                      self.model.inputImgPh: s1_imgs[i:i+batch]})
-            s1_preds.extend(pred_imgs)
+            s1_preds = list()
+            for i in range(0, num_imgs, batch):
+                pred_imgs = self.sess.run(self.model.predTest, feed_dict={self.model.ratePh: 0.,
+                                                                          self.model.trainMode: False,
+                                                                          self.model.inputImgPh: s1_imgs[i:i+batch]})
+                s1_preds.extend(pred_imgs)
 
-        s1_preds = np.asarray(s1_preds)
+            s1_preds = np.asarray(s1_preds)
 
-        # Save stage 1 results
-        utils.save_imgs_indiv(s1_imgs, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
-                              img_name=img_name.astype('U26'), is_label=False, name_append='s1_img_')
-        utils.save_imgs_indiv(s1_preds, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
-                              img_name=img_name.astype('U26'), is_label=True, name_append='s1_seg_')
+            # Save stage 1 results
+            # utils.save_imgs_indiv(s1_imgs, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=False, name_append='s1_img_')
+            # utils.save_imgs_indiv(s1_preds, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=True, name_append='s1_seg_')
+
+            # Save stage 2 results
+            # s2_imgs = utils.inverse_rotate(s1_imgs, batch=batch, is_label=False)
+            s2_preds = utils.inverse_rotate(s1_preds, batch=batch, is_label=True)
+            # utils.save_imgs_indiv(s2_imgs, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=False, name_append='s2_img_')
+            # utils.save_imgs_indiv(s2_preds, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=True, name_append='s2_seg_')
+
+            # Save stage 3 results
+            # s3_imgs = utils.inverse_flip(s2_imgs)
+            s3_preds = utils.inverse_flip(s2_preds)
+            # utils.save_imgs_indiv(s3_imgs, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=False, name_append='s3_img_')
+            # utils.save_imgs_indiv(s3_preds, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=True, name_append='s3_seg_')
+
+            # Save stage 4 results
+            # s4_imgs = utils.inverse_cropping(s3_imgs, batch=batch, is_label=False)
+            s4_preds = utils.inverse_cropping(s3_preds, batch=batch, is_label=True)
+            # utils.save_imgs_indiv(s4_imgs, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=False, name_append='s4_img_')
+            # utils.save_imgs_indiv(s4_preds, w_num_imgs=batch, save_dir=os.path.join(save_dir, 'debug'),
+            #                       img_name=img_name.astype('U26'), is_label=True, name_append='s4_seg_')
+
+            # Save stage 5 results
+            predCls = np.argmax(np.sum(s4_preds, axis=0, keepdims=True), axis=3)
+            utils.save_imgs(img_stores=[np.expand_dims(s1_imgs[5], axis=0),
+                                        np.expand_dims(np.argmax(s4_preds[5], axis=2), axis=0),
+                                        predCls],
+                                        saveDir=os.path.join(save_dir, 'debug'),
+                                        img_name=img_name.astype('U26'),
+                                        is_vertical=False)
+
+            # Save images
+            utils.save_imgs(img_stores=[np.expand_dims(s1_imgs[5], axis=0), predCls],
+                            saveDir=save_dir,
+                            img_name=img_name.astype('U26'),
+                            is_vertical=False)
+
+            # Write as npy format
+            utils.save_npy(data=predCls,
+                           save_dir=save_dir,
+                           file_name=img_name.astype('U26'))
+
     
     # def test_test(self, save_dir, is_debug=True):
     #     print('Number of iterations: {}'.format(self.data.numTestImgs))
