@@ -229,17 +229,16 @@ class Solver(object):
             # Save stage 5 results
             print('[*] Stage 5: Calculaing the final prediction...')
             predCls = np.argmax(np.sum(s4_preds, axis=0, keepdims=True), axis=3)
-            if is_debug:
-                utils.save_imgs(img_stores=[np.expand_dims(s1_imgs[5], axis=0),
-                                            np.expand_dims(np.argmax(s4_preds[5], axis=2), axis=0),
-                                            predCls],
-                                            saveDir=os.path.join(save_dir, 'debug'),
-                                            img_name=img_name.astype('U26'),
-                                            is_vertical=False)
+            utils.save_imgs(img_stores=[np.expand_dims(s1_imgs[int(np.ceil(batch*0.5))], axis=0),
+                                        np.expand_dims(np.argmax(s4_preds[int(np.ceil(batch*0.5))], axis=2), axis=0),
+                                        predCls],
+                            saveDir=os.path.join(save_dir, 'debug'),
+                            img_name=img_name.astype('U26'),
+                            is_vertical=False)
 
             # Save images
             print('[*] Saving the input and prediction image...')
-            utils.save_imgs(img_stores=[np.expand_dims(s1_imgs[int(batch * 0.5)], axis=0), predCls],
+            utils.save_imgs(img_stores=[np.expand_dims(s1_imgs[int(np.ceil(batch*0.5))], axis=0), predCls],
                             saveDir=save_dir,
                             img_name=img_name.astype('U26'),
                             is_vertical=False)
