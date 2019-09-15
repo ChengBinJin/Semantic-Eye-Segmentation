@@ -390,7 +390,7 @@ def xavier_init(in_dim):
 
 def print_activations(t, logger=None):
     if logger is None:
-        print(t.op.name, ': {}', t.get_shape().as_list())
+        print(t.op.name, ': {}'.format(t.get_shape().as_list()))
     else:
         logger.info(t.op.name + ': {}'.format(t.get_shape().as_list()))
 
