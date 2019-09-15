@@ -33,7 +33,7 @@ class UNet(object):
         self.multi_test = False if self.isTrain else multi_test
         self.advanced_multi_test = advanced_multi_test
         self.degree = 10
-        self.num_try = len(range(-self.degree, self.degree+1, 2))  # multi_tes: from -10 degree to 11 degrees
+        self.num_try = len(range(-self.degree, self.degree+1, 1))  # multi_tes: from -10 degree to 11 degrees
         self.conv_dims = self.set_conv_dims(self.method)
 
         self.dataPath = dataPath

@@ -15,7 +15,7 @@ import utils as utils
 from reader import Reader
 
 def test_advanced_multi_test(dataPath, decodeImgShape, margin=5, savePath='../debugImgs'):
-    testReader = Reader(tfrecordsFile=dataPath, decodeImgShape=decodeImgShape)
+    testReader = Reader(tfrecordsFile=dataPath, decodeImgShape=decodeImgShape, minQueueExamples=1)
     imgOp, segImgOp = testReader.test_advanced_multi_test()
 
     sess = tf.compat.v1.Session()
@@ -37,7 +37,7 @@ def test_advanced_multi_test(dataPath, decodeImgShape, margin=5, savePath='../de
             segImg = np.squeeze(segImg).astype(np.uint8)
 
             num_imgs, h, w = img.shape
-            w_num_imgs = 11
+            w_num_imgs = 21
             h_num_imgs = int(num_imgs / w_num_imgs)
 
             img_canvas = np.zeros((h_num_imgs*h+(1+h_num_imgs)*margin, w_num_imgs*w+(w_num_imgs+1)*margin),
@@ -54,8 +54,13 @@ def test_advanced_multi_test(dataPath, decodeImgShape, margin=5, savePath='../de
                 seg_canvas[(x_idx+1)*margin+x_idx*h:(x_idx+1)*margin+(x_idx+1)*h,
                 (y_idx+1)*margin+y_idx*w:(y_idx+1)*margin+(y_idx+1)*w] = utils.convert_color_label(segImg[j])
 
+            # Resize the big canvas
+            img_canvas = cv2.resize(img_canvas, None, fx=0.25, fy=0.25)
+            seg_canvas = cv2.resize(seg_canvas, None, fx=0.25, fy=0.25)
+
             cv2.imwrite(os.path.join(savePath, 'test_advanced_multi_test_img_' + str(i).zfill(2) + '.png'), img_canvas)
             cv2.imwrite(os.path.join(savePath, 'test_advanced_multi_test_seg_' + str(i).zfill(2) + '.png'), seg_canvas)
+
         print('[!] Finished!')
 
     except KeyboardInterrupt:

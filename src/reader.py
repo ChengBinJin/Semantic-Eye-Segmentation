@@ -110,10 +110,10 @@ class Reader(object):
                                       capacity=self.minQueueExamples + 3 * self.batchSize,
                                       min_after_dequeue=self.minQueueExamples)
 
-    def batch(self, multi_test=False, use_advanced=False):
+    def batch(self, multi_test=False, use_advanced=False, interval=1):
         if multi_test:
             if use_advanced:
-                img, segImg = self.multi_test_process_advanced(self.imgOri, self.segImgOri)
+                img, segImg = self.multi_test_process_advanced(self.imgOri, self.segImgOri, interval=interval)
             else:
                 img, segImg = self.multi_test_process(self.imgOri, self.segImgOri)
         else:
@@ -125,7 +125,7 @@ class Reader(object):
                               capacity=self.minQueueExamples + 3 * self.batchSize,
                               allow_smaller_final_batch=True)
 
-    def multi_test_process_advanced(self, imgOri, segImgOri):
+    def multi_test_process_advanced(self, imgOri, segImgOri, interval=1):
         hMargin = int(self.resizeFactor * self.imgShape[0]) - self.imgShape[0]
         wMargin = int(self.resizeFactor * self.imgShape[1]) - self.imgShape[1]
 
@@ -186,7 +186,7 @@ class Reader(object):
 
         imgs_, segImgs_ = list(), list()
         for imgOri_, segImgOri_ in zip(imgs + flipImgs, segImgs + flipSegImgs):
-            for degree in range(-10, 11, 2):
+            for degree in range(-int(self.rotateAngle), int(self.rotateAngle + 1), interval):
                 img, segImg = self.fixed_rotation(imgOri_, segImgOri_, degree)
                 imgs_.append(img), segImgs_.append(segImg)
 

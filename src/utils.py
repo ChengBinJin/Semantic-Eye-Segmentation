@@ -413,7 +413,8 @@ def inverse_rotate(imgs, max_degree=10, interval=2, batch=11, is_label=False):
 
     return np.asarray(results)
 
-def save_imgs_indiv(imgs, w_num_imgs, save_dir=None, img_name=None, name_append='', is_label=False, margin=5):
+def save_imgs_indiv(imgs, w_num_imgs, save_dir=None, img_name=None, name_append='', is_label=False, margin=5,
+                    factor=1.0):
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
 
@@ -444,6 +445,7 @@ def save_imgs_indiv(imgs, w_num_imgs, save_dir=None, img_name=None, name_append=
             canvas[(x_idx + 1) * margin + x_idx * h:(x_idx + 1) * margin + (x_idx + 1) * h,
             (y_idx + 1) * margin + y_idx * w:(y_idx + 1) * margin + (y_idx + 1) * w] = imgs[j]
 
+    canvas = cv2.resize(canvas, None, fx=factor, fy=factor)
     cv2.imwrite(os.path.join(save_dir, name_append + img_name[0]), canvas)
 
 def save_imgs(img_stores, iterTime=None, saveDir=None, margin=5, img_name=None, name_append='', is_vertical=True):
